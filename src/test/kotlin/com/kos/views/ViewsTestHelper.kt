@@ -6,4 +6,5 @@ object ViewsTestHelper {
     val name = "name"
     val owner = "owner"
     val basicSimpleView = SimpleView(id, name, owner, listOf())
+    val basicView = View(id, name, owner, listOf())
 }

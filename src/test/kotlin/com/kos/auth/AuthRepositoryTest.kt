@@ -14,7 +14,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-abstract class AuthRepositoryTestCommon {
+abstract class AuthRepositoryTest {
 
     abstract val repository: AuthRepository
     @BeforeTest
@@ -48,14 +48,14 @@ abstract class AuthRepositoryTestCommon {
     }
 }
 
-class AuthInMemoryRepositoryTest : AuthRepositoryTestCommon() {
+class AuthInMemoryRepositoryTest : AuthRepositoryTest() {
     override val repository = AuthInMemoryRepository()
     override fun beforeEach() {
         repository.clear()
     }
 }
 
-class AuthDatabaseRepositoryTest : AuthRepositoryTestCommon() {
+class AuthDatabaseRepositoryTest : AuthRepositoryTest() {
     override val repository: AuthRepository = AuthDatabaseRepository()
     override fun beforeEach() {
         DatabaseFactory.init(mustClean = true)

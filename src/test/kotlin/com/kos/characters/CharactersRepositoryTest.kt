@@ -9,7 +9,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-abstract class CharactersRepositoryTestCommon {
+abstract class CharactersRepositoryTest {
 
     abstract val repository: CharactersRepository
 
@@ -31,14 +31,14 @@ abstract class CharactersRepositoryTestCommon {
     }
 }
 
-class CharactersInMemoryRepositoryTest : CharactersRepositoryTestCommon() {
+class CharactersInMemoryRepositoryTest : CharactersRepositoryTest() {
     override val repository = CharactersInMemoryRepository()
     override fun beforeEach() {
         repository.clear()
     }
 }
 
-class CharactersDatabaseRepositoryTest : CharactersRepositoryTestCommon() {
+class CharactersDatabaseRepositoryTest : CharactersRepositoryTest() {
     override val repository = CharactersDatabaseRepository()
     override fun beforeEach() {
         DatabaseFactory.init(mustClean = true)

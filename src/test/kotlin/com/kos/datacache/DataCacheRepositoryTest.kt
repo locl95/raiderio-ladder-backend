@@ -11,7 +11,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-abstract class DataCacheRepositoryTestCommon {
+abstract class DataCacheRepositoryTest {
 
     abstract val repository: DataCacheRepository
 
@@ -53,14 +53,14 @@ abstract class DataCacheRepositoryTestCommon {
     }
 }
 
-class DataCacheInMemoryRepositoryTest : DataCacheRepositoryTestCommon() {
+class DataCacheInMemoryRepositoryTest : DataCacheRepositoryTest() {
     override val repository = DataCacheInMemoryRepository()
     override fun beforeEach() {
         repository.clear()
     }
 }
 
-class DataCacheDatabaseRepositoryTest : DataCacheRepositoryTestCommon() {
+class DataCacheDatabaseRepositoryTest : DataCacheRepositoryTest() {
     override val repository: DataCacheRepository = DataCacheDatabaseRepository()
     override fun beforeEach() {
         DatabaseFactory.init(mustClean = true)

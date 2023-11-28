@@ -4,6 +4,8 @@ import arrow.core.Either
 import arrow.core.traverse
 import com.kos.common.JsonParseError
 import com.kos.characters.Spec
+import com.kos.eventsourcing.events.Event
+import com.kos.eventsourcing.events.EventData
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -35,7 +37,11 @@ object RaiderIoProtocol {
         }
     }
 
-    fun parseMythicPlusRanks(jsonString: String, specs: List<Spec>, scores: SeasonScores): Either<JsonParseError, List<MythicPlusRankWithSpecName>> {
+    fun parseMythicPlusRanks(
+        jsonString: String,
+        specs: List<Spec>,
+        scores: SeasonScores
+    ): Either<JsonParseError, List<MythicPlusRankWithSpecName>> {
         val mythicPlusRanks = json.parseToJsonElement(jsonString)
             .jsonObject["mythic_plus_ranks"]
             ?.jsonObject
@@ -49,7 +55,7 @@ object RaiderIoProtocol {
             val region = ranks?.get("region")?.jsonPrimitive?.int
             val realm = ranks?.get("realm")?.jsonPrimitive?.int
 
-            val specScore = when(it.internalSpec) {
+            val specScore = when (it.internalSpec) {
                 0 -> scores.spec0
                 1 -> scores.spec1
                 2 -> scores.spec2
@@ -57,7 +63,15 @@ object RaiderIoProtocol {
                 else -> 0.0
             }
 
-            if (world != null && region != null && realm != null) Either.Right(MythicPlusRankWithSpecName(it.name, specScore, world, region, realm))
+            if (world != null && region != null && realm != null) Either.Right(
+                MythicPlusRankWithSpecName(
+                    it.name,
+                    specScore,
+                    world,
+                    region,
+                    realm
+                )
+            )
             else Either.Left(JsonParseError(jsonString, "/mythic_plus_ranks/spec_$it"))
         }
     }
@@ -176,5 +190,6 @@ data class RaiderIoData(
     val mythicPlusRanks: MythicPlusRanksWithSpecs,
     val mythicPlusBestRuns: List<MythicPlusRun>,
     val mythicPlusAlternateRuns: List<MythicPlusRun>
-)
+): EventData
+
 

@@ -5,24 +5,21 @@ import arrow.core.sequence
 import arrow.core.traverse
 import com.kos.characters.CharactersService
 import com.kos.common.JsonParseError
-import com.kos.datacache.DataCache
 import com.kos.datacache.DataCacheService
+import com.kos.eventsourcing.events.Event
+import com.kos.eventsourcing.events.repository.EventStore
 import com.kos.raiderio.RaiderIoClient
 import com.kos.raiderio.RaiderIoData
-import com.kos.raiderio.RaiderIoResponse
 import com.kos.views.repository.ViewsRepository
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.time.OffsetDateTime
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import org.jetbrains.exposed.sql.transactions.experimental.suspendedTransactionAsync
 
 class ViewsService(
     private val viewsRepository: ViewsRepository,
+    private val eventStore: EventStore,
     private val charactersService: CharactersService,
     private val dataCacheService: DataCacheService,
     private val raiderIoClient: RaiderIoClient
@@ -80,34 +77,18 @@ class ViewsService(
                                     2,
                                     RoundingMode.HALF_EVEN
                                 )
-                            Either.Right(
-                                it.second.profile.toRaiderIoData(
-                                    it.first,
-                                    quantile.toDouble(),
-                                    it.second.specs
-                                )
+                            val raiderIoData = it.second.profile.toRaiderIoData(
+                                it.first,
+                                quantile.toDouble(),
+                                it.second.specs
                             )
+                            eventStore.save(Event("character/${it.first}", "RaiderioDataReceived", raiderIoData))
+                            Either.Right(raiderIoData)
                         }
                     }
                 }
             }
         }
-        /*
-        TODO: This will be used in the future again. We will make usage of every call to raiderio to avoid
-        TODO: needing to retrieve data for every character again if it was called in a 1h period. This will lighten
-        TODO: the scheduled task.
-        eitherJsonErrorOrData.onRight {
-            it.forEach { data ->
-                dataCacheService.insert(
-                    DataCache(
-                        data.id,
-                        json.encodeToString(data),
-                        OffsetDateTime.now()
-                    )
-                )
-            }
-        }
-        */
         eitherJsonErrorOrData
     }
 
