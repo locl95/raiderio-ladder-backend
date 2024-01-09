@@ -37,3 +37,8 @@ data class ViewNotFound(val viewId: String) : ViewResult {
 class TooMuchViews : ViewResult {
     override val isSuccess: Boolean = false
 }
+
+@Serializable
+data class InsertCharacterError(val message: String) : ViewResult {
+    override val isSuccess: Boolean = false
+}

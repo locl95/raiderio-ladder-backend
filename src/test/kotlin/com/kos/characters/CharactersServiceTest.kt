@@ -8,6 +8,7 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.fail
 
 class CharactersServiceTest {
     private val raiderIoClient = mock(RaiderIoClient::class.java)
@@ -28,7 +29,8 @@ class CharactersServiceTest {
             val request = listOf(request1, request2)
             val expected: List<Long> = listOf(1, 2)
 
-            assertEquals(expected, charactersService.createAndReturnIds(request))
+            charactersService.createAndReturnIds(request).fold({ fail() }) { assertEquals(expected, it) }
+
         }
     }
 
@@ -47,8 +49,8 @@ class CharactersServiceTest {
 
             val request = listOf(request1, request2)
             val expected: List<Long> = listOf(1)
+            charactersService.createAndReturnIds(request).fold({ fail() }) { assertEquals(expected, it) }
 
-            assertEquals(expected, charactersService.createAndReturnIds(request))
         }
     }
 }

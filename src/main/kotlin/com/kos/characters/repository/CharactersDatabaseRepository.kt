@@ -1,10 +1,15 @@
 package com.kos.characters.repository
 
+import arrow.core.Either
+import arrow.core.left
+import arrow.core.right
 import com.kos.characters.Character
 import com.kos.characters.CharacterRequest
 import com.kos.common.DatabaseFactory.dbQuery
+import com.kos.views.InsertCharacterError
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.TransactionManager
+import java.sql.SQLException
 
 class CharactersDatabaseRepository : CharactersRepository {
 
@@ -36,17 +41,22 @@ class CharactersDatabaseRepository : CharactersRepository {
         row[Characters.realm]
     )
 
-    override suspend fun insert(characters: List<CharacterRequest>): List<Character> {
+    override suspend fun insert(characters: List<CharacterRequest>): Either<InsertCharacterError, List<Character>> {
         return dbQuery {
             val charsToInsert = characters.map {
                 Character(selectNextId(), it.name, it.region, it.realm)
             }
-            Characters.batchInsert(charsToInsert) {
-                this[Characters.id] = it.id
-                this[Characters.name] = it.name
-                this[Characters.region] = it.region
-                this[Characters.realm] = it.realm
-            }.map { resultRowToCharacter(it) }
+            try {
+                val insertedCharacters = Characters.batchInsert(charsToInsert) {
+                    this[Characters.id] = it.id
+                    this[Characters.name] = it.name
+                    this[Characters.region] = it.region
+                    this[Characters.realm] = it.realm
+                }.map { resultRowToCharacter(it) }
+                Either.Right(insertedCharacters)
+            } catch (e: SQLException) {
+                Either.Left(InsertCharacterError(e.message ?: e.stackTraceToString()))
+            }
         }
     }
 
@@ -59,7 +69,7 @@ class CharactersDatabaseRepository : CharactersRepository {
     }
 
     override suspend fun get(): List<Character> =
-         dbQuery { Characters.selectAll().map { resultRowToCharacter(it) } }
+        dbQuery { Characters.selectAll().map { resultRowToCharacter(it) } }
 
     override suspend fun state(): List<Character> {
         return dbQuery {
