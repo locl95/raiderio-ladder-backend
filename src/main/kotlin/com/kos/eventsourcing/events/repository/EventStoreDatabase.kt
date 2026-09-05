@@ -13,8 +13,11 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import java.time.OffsetDateTime
 import kotlin.sequences.Sequence
 
 class EventStoreDatabase(private val db: Database) : EventStore {
@@ -51,6 +54,7 @@ class EventStoreDatabase(private val db: Database) : EventStore {
         val operationId = varchar("operation_id", 128)
         val eventType = varchar("event_type", 48)
         val data = text("data")
+        val timestamp = text("timestamp")
 
         override val primaryKey = PrimaryKey(version)
     }
@@ -78,6 +82,7 @@ class EventStoreDatabase(private val db: Database) : EventStore {
                     it[version] = id
                     it[eventType] = event.eventData.eventType.toString()
                     it[data] = json.encodeToString(event.eventData)
+                    it[timestamp] = OffsetDateTime.now().toString()
                 }.resultedValues?.map { resultRowToOperation(it) }?.singleOrNull() ?: throw Exception(":(")
             }
         }.mapLeft { RepositoryError(it.message ?: it.stackTraceToString()) }
@@ -102,6 +107,14 @@ class EventStoreDatabase(private val db: Database) : EventStore {
         }
     }
 
+    override suspend fun deleteEventsOlderThan(timestamp: OffsetDateTime, upToVersion: Long): Int {
+        return newSuspendedTransaction(Dispatchers.IO, db) {
+            Events.deleteWhere {
+                Events.timestamp.less(timestamp.toString()) and Events.version.lessEq(upToVersion)
+            }
+        }
+    }
+
     override suspend fun state(): List<EventWithVersion> {
         return newSuspendedTransaction(Dispatchers.IO, db) {
             Events.selectAll().map { resultRowToEventWithVersion(it) }
@@ -109,6 +122,7 @@ class EventStoreDatabase(private val db: Database) : EventStore {
     }
 
     override suspend fun withState(initialState: List<EventWithVersion>): EventStore {
+        val now = OffsetDateTime.now().toString()
         newSuspendedTransaction(Dispatchers.IO, db) {
             Events.batchInsert(initialState) {
                 this[Events.aggregateRoot] = it.event.aggregateRoot
@@ -116,6 +130,7 @@ class EventStoreDatabase(private val db: Database) : EventStore {
                 this[Events.version] = it.version
                 this[Events.eventType] = it.event.eventData.eventType.toString()
                 this[Events.data] = json.encodeToString(it.event.eventData)
+                this[Events.timestamp] = now
             }
         }
         return this

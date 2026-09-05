@@ -14,6 +14,7 @@ import org.jetbrains.exposed.sql.Database
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInstance
+import java.time.OffsetDateTime
 import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -130,6 +131,54 @@ abstract class EventStoreTest {
             val storeWithEvents = store.withState(listOf(event1))
 
             assertEquals(emptyList(), storeWithEvents.getEventsByOperationId("unknown-op"))
+        }
+    }
+
+    @Test
+    fun `given a store with events deleteEventsOlderThan does not delete events newer than the given timestamp`() {
+        runBlocking {
+            val payload = ViewToBeCreatedEvent(
+                UUID.randomUUID().toString(),
+                basicSimpleWowView.name,
+                basicSimpleWowView.published,
+                listOf(),
+                basicSimpleWowView.game,
+                basicSimpleWowView.owner,
+                basicSimpleWowView.featured,
+                null
+            )
+            store.save(Event("/credentials/client1", UUID.randomUUID().toString(), payload))
+
+            val deleted = store.deleteEventsOlderThan(OffsetDateTime.now().minusDays(1), Long.MAX_VALUE)
+
+            assertEquals(0, deleted)
+            assertEquals(1, store.getEvents(null).toList().size)
+        }
+    }
+
+    @Test
+    fun `given a store with events deleteEventsOlderThan deletes events older than the given timestamp up to the given version`() {
+        runBlocking {
+            val payload = ViewToBeCreatedEvent(
+                UUID.randomUUID().toString(),
+                basicSimpleWowView.name,
+                basicSimpleWowView.published,
+                listOf(),
+                basicSimpleWowView.game,
+                basicSimpleWowView.owner,
+                basicSimpleWowView.featured,
+                null
+            )
+            store.save(Event("/credentials/client1", UUID.randomUUID().toString(), payload))
+            store.save(Event("/credentials/client1", UUID.randomUUID().toString(), payload))
+            val cutoff = OffsetDateTime.now().plusDays(1)
+
+            val deleted = store.deleteEventsOlderThan(cutoff, 1)
+
+            assertEquals(1, deleted)
+            val remaining = store.getEvents(null).toList()
+            assertEquals(1, remaining.size)
+            assertEquals(2, remaining.single().version)
         }
     }
 }
