@@ -1,5 +1,20 @@
 # Changelog
 
+## [5.12.0] - 06-09-2026
+
+### Added
+
+- **`EVENT_CLEANUP_TASK`**: new scheduled task, run every 3 days, that purges old rows from the `events` table to keep
+  it bounded on a resource-constrained Postgres plan.
+    - New `events.timestamp` column (migration `V1788644922`), plus an index — `version` alone (a monotonic sequence)
+      carried no wall-clock information to filter by age.
+    - `EventStore.deleteEventsOlderThan(timestamp, upToVersion)` deletes only rows that are both older than the cutoff
+      and at or below `upToVersion`, implemented in `EventStoreDatabase` and `EventStoreInMemory`.
+    - `EventCleanupTaskRunner` computes `upToVersion` as the minimum `version` already processed across all registered
+      `EventSubscription`s (`views`/`sync-lol`/`sync-wow`/`sync-wow-hc`/`entities`), so an event is never deleted
+      before every subscription has consumed it — guards against silent event loss if a subscription falls behind or
+      a future one needs to replay from the beginning.
+
 ## [5.11.0] - 29-08-2026
 
 ### Added
