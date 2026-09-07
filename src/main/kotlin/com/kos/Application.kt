@@ -228,11 +228,13 @@ fun Application.module() {
 
     val executorService: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
     val tasksRepository = TasksDatabaseRepository(db)
+    val subscriptionsRepository = SubscriptionsDatabaseRepository(db)
 
     val taskRunnerProvider = TaskRunnerProvider(
         listOf(
             TokenCleanupTaskRunner(tasksRepository, authService),
             TaskCleanupTaskRunner(tasksRepository),
+            EventCleanupTaskRunner(tasksRepository, eventStore, subscriptionsRepository),
             UpdateLolEntitiesTaskRunner(tasksRepository, entitiesService),
             CacheClearTaskRunner(tasksRepository, dataCacheService),
             UpdateWowHardcoreGuildsTaskRunner(tasksRepository, entitiesService),
@@ -275,7 +277,6 @@ fun Application.module() {
 
     coroutineScope.launch { tasksLauncher.launchTasks() }
 
-    val subscriptionsRepository = SubscriptionsDatabaseRepository(db)
     val eventSubscriptionsService = EventSubscriptionService(subscriptionsRepository)
     val eventSubscriptionController = EventSubscriptionController(eventSubscriptionsService)
 
