@@ -311,7 +311,8 @@ class BlizzardHttpClient(
         return throttleRequest {
             either {
                 val tokenResponse = getAndUpdateToken().bind()
-                val partialURI = URI("/data/wow/guild/$realm/$guild/roster?namespace=profile-classic1x-eu&locale=en_US")
+                val partialURI =
+                    URI("/data/wow/guild/$realm/${slugify(guild)}/roster?namespace=profile-classic1x-eu&locale=en_US")
 
                 retryEitherWithFixedDelay(
                     retryConfig = retryConfig,
@@ -340,7 +341,7 @@ class BlizzardHttpClient(
             either {
                 val tokenResponse = getAndUpdateToken().bind()
                 val namespace = "profile-$region"
-                val partialURI = URI("/data/wow/guild/$realm/$guild/roster?namespace=$namespace&locale=en_US")
+                val partialURI = URI("/data/wow/guild/$realm/${slugify(guild)}/roster?namespace=$namespace&locale=en_US")
 
                 retryEitherWithFixedDelay(
                     retryConfig = retryConfig,
@@ -411,4 +412,6 @@ class BlizzardHttpClient(
     }
 
     private fun encodedName(name: String) = URLEncoder.encode(name, StandardCharsets.UTF_8.toString())
+
+    private fun slugify(name: String) = name.trim().replace(Regex("\\s+"), "-")
 }
