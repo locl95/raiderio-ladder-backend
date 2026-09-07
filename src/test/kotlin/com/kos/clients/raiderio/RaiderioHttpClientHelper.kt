@@ -59,8 +59,6 @@ object RaiderIoHttpClientHelper {
                                 headers = headersOf(HttpHeaders.ContentType, "application/json")
                             )
 
-                            "timeout-character" -> throw HttpRequestTimeoutException(request.url.toString(), null)
-
                             else -> {
                                 val response = when (request.url.parameters["fields"]) {
                                     "talents" -> ResourceLoader.readResource("unit/wow/raiderio-classic-talents-response.json")

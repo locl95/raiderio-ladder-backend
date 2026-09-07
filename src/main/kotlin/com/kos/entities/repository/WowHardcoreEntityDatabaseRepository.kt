@@ -38,7 +38,13 @@ class WowHardcoreEntityDatabaseRepository(private val db: Database) :
     override suspend fun insert(entities: List<InsertEntityRequest>): Either<RepositoryError, List<Entity>> = either {
         val charsToInsert = entities.map { request ->
             ensure(request is WowEntityRequest) { RepositoryError("problem inserting $request for WOW_HC") }
-            WowEntity(selectNextId(db), request.name.lowercase(), request.region, request.realm, request.blizzardId ?: 0)
+            WowEntity(
+                selectNextId(db),
+                request.name.lowercase(),
+                request.region,
+                request.realm,
+                request.blizzardId ?: 0
+            )
         }
         newSuspendedTransaction(Dispatchers.IO, db) {
             transaction {

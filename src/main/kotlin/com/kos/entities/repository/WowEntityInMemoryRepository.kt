@@ -52,7 +52,13 @@ class WowEntityInMemoryRepository(
                 entities.removeAt(index)
                 entities.add(
                     index,
-                    WowEntity(id, entity.name.lowercase(), entity.region, entity.realm, entity.blizzardId ?: current.blizzardId)
+                    WowEntity(
+                        id,
+                        entity.name.lowercase(),
+                        entity.region,
+                        entity.realm,
+                        entity.blizzardId ?: current.blizzardId
+                    )
                 )
                 Either.Right(1)
             }
