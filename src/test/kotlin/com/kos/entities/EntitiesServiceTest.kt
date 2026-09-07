@@ -1,10 +1,13 @@
 package com.kos.entities
 
 import arrow.core.Either
+import com.kos.clients.HttpError
 import com.kos.clients.TimeoutError
 import com.kos.clients.blizzard.BlizzardClient
 import com.kos.clients.domain.GetPUUIDResponse
 import com.kos.clients.domain.GetSummonerResponse
+import com.kos.clients.domain.GetWowRosterResponse
+import com.kos.clients.domain.WowGuildResponse
 import com.kos.clients.raiderio.RaiderIoClient
 import com.kos.clients.riot.RiotClient
 import com.kos.datacache.BlizzardMockHelper
@@ -53,8 +56,12 @@ class EntitiesServiceTest {
                 WowEntityRequest(basicWowEntity.name, basicWowEntity.region, basicWowEntity.realm)
             val request2 = WowEntityRequest("kakarøna", basicWowEntity.region, basicWowEntity.realm)
 
-            `when`(raiderIoClient.exists(request1)).thenReturn(Either.Right(true))
-            `when`(raiderIoClient.exists(request2)).thenReturn(Either.Right(true))
+            `when`(blizzardClient.getRetailProfile(request1.region, request1.realm, request1.name)).thenReturn(
+                BlizzardMockHelper.getCharacterProfile(request1)
+            )
+            `when`(blizzardClient.getRetailProfile(request2.region, request2.realm, request2.name)).thenReturn(
+                BlizzardMockHelper.getCharacterProfile(request2)
+            )
 
 
             val entitiesService = createService(emptyEntitiesState)
@@ -79,10 +86,10 @@ class EntitiesServiceTest {
                 WowEntityRequest(basicWowEntity.name, basicWowEntity.region, basicWowEntity.realm)
             val request2 = WowEntityRequest("kakarøna", basicWowEntity.region, basicWowEntity.realm)
 
-            `when`(blizzardClient.getCharacterProfile(request1.region, request1.realm, request1.name)).thenReturn(
+            `when`(blizzardClient.getClassicProfile(request1.region, request1.realm, request1.name)).thenReturn(
                 BlizzardMockHelper.getCharacterProfile(request1)
             )
-            `when`(blizzardClient.getCharacterProfile(request2.region, request2.realm, request2.name)).thenReturn(
+            `when`(blizzardClient.getClassicProfile(request2.region, request2.realm, request2.name)).thenReturn(
                 BlizzardMockHelper.getCharacterProfile(request2)
             )
             `when`(blizzardClient.getRealm(request1.region, 5220)).thenReturn(Either.Right(hardcoreRealm))
@@ -110,7 +117,7 @@ class EntitiesServiceTest {
             val request1 =
                 WowEntityRequest(basicWowEntity.name, basicWowEntity.region, basicWowEntity.realm)
 
-            `when`(blizzardClient.getCharacterProfile(request1.region, request1.realm, request1.name)).thenReturn(
+            `when`(blizzardClient.getClassicProfile(request1.region, request1.realm, request1.name)).thenReturn(
                 BlizzardMockHelper.getCharacterProfile(request1)
             )
             `when`(blizzardClient.getRealm(request1.region, 5220)).thenReturn(Either.Right(notHardcoreRealm))
@@ -137,8 +144,12 @@ class EntitiesServiceTest {
                 WowEntityRequest(basicWowEntity.name, basicWowEntity.region, basicWowEntity.realm)
             val request2 = WowEntityRequest("kakarøna", basicWowEntity.region, basicWowEntity.realm)
 
-            `when`(raiderIoClient.exists(request1)).thenReturn(Either.Right(true))
-            `when`(raiderIoClient.exists(request2)).thenReturn(Either.Right(false))
+            `when`(blizzardClient.getRetailProfile(request1.region, request1.realm, request1.name)).thenReturn(
+                BlizzardMockHelper.getCharacterProfile(request1)
+            )
+            `when`(
+                blizzardClient.getRetailProfile(request2.region, request2.realm, request2.name)
+            ).thenReturn(Either.Left(HttpError(404, null)))
 
             val entitiesService = createService(emptyEntitiesState)
 
@@ -165,7 +176,7 @@ class EntitiesServiceTest {
             )
 
             `when`(
-                blizzardClient.getCharacterProfile(
+                blizzardClient.getClassicProfile(
                     basicWowHardcoreEntity.region,
                     basicWowHardcoreEntity.realm,
                     basicWowHardcoreEntity.name
@@ -492,7 +503,9 @@ class EntitiesServiceTest {
     @Test
     fun `exists merges characters confirmed by the repository and by the third party into exist`() {
         runBlocking {
-            `when`(raiderIoClient.exists(basicWowRequest2)).thenReturn(Either.Right(true))
+            `when`(
+                blizzardClient.getRetailProfile(basicWowRequest2.region, basicWowRequest2.realm, basicWowRequest2.name)
+            ).thenReturn(BlizzardMockHelper.getCharacterProfile(basicWowRequest2))
 
             val entitiesService = createService(EntitiesState(listOf(basicWowEntity), listOf(), listOf()))
 
@@ -511,7 +524,9 @@ class EntitiesServiceTest {
     @Test
     fun `exists reports characters that don't exist anywhere as nonExisting`() {
         runBlocking {
-            `when`(raiderIoClient.exists(basicWowRequest)).thenReturn(Either.Right(false))
+            `when`(
+                blizzardClient.getRetailProfile(basicWowRequest.region, basicWowRequest.realm, basicWowRequest.name)
+            ).thenReturn(Either.Left(HttpError(404, null)))
 
             val entitiesService = createService(emptyEntitiesState)
 
@@ -525,9 +540,11 @@ class EntitiesServiceTest {
     }
 
     @Test
-    fun `exists reports a character as unchecked instead of nonExisting when raiderio can't be reached`() {
+    fun `exists reports a character as unchecked instead of nonExisting when blizzard can't be reached`() {
         runBlocking {
-            `when`(raiderIoClient.exists(basicWowRequest)).thenReturn(Either.Left(TimeoutError("Request timeout has expired")))
+            `when`(
+                blizzardClient.getRetailProfile(basicWowRequest.region, basicWowRequest.realm, basicWowRequest.name)
+            ).thenReturn(Either.Left(TimeoutError("Request timeout has expired")))
 
             val entitiesService = createService(emptyEntitiesState)
 
@@ -538,6 +555,55 @@ class EntitiesServiceTest {
                 assertEquals(listOf(), res.nonExisting)
                 assertEquals(listOf(basicWowRequest.toResponse()), res.unchecked)
             }
+        }
+    }
+
+    @Test
+    fun `guildExists returns the guild payload when the guild exists`() {
+        runBlocking {
+            `when`(blizzardClient.getRetailGuildRoster("eu", "twisting-nether", "Method")).thenReturn(
+                Either.Right(
+                    GetWowRosterResponse(listOf(), WowGuildResponse(999))
+                )
+            )
+
+            val entitiesService = createService(emptyEntitiesState)
+
+            val result = entitiesService.guildExists("Method", "eu", "twisting-nether")
+
+            result.onLeft { fail() }.onRight { res ->
+                assertEquals(GuildPayload("method", "twisting-nether", "eu", 999), res.guild)
+            }
+        }
+    }
+
+    @Test
+    fun `guildExists returns a null guild when it doesn't exist`() {
+        runBlocking {
+            `when`(blizzardClient.getRetailGuildRoster("eu", "twisting-nether", "Method"))
+                .thenReturn(Either.Left(HttpError(404, null)))
+
+            val entitiesService = createService(emptyEntitiesState)
+
+            val result = entitiesService.guildExists("Method", "eu", "twisting-nether")
+
+            result.onLeft { fail() }.onRight { res ->
+                assertEquals(null, res.guild)
+            }
+        }
+    }
+
+    @Test
+    fun `guildExists returns a Left when blizzard can't be reached`() {
+        runBlocking {
+            `when`(blizzardClient.getRetailGuildRoster("eu", "twisting-nether", "Method"))
+                .thenReturn(Either.Left(TimeoutError("Request timeout has expired")))
+
+            val entitiesService = createService(emptyEntitiesState)
+
+            val result = entitiesService.guildExists("Method", "eu", "twisting-nether")
+
+            result.onRight { fail() }
         }
     }
 

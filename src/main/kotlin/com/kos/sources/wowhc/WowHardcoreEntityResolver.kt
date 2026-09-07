@@ -58,7 +58,7 @@ class WowHardcoreEntityResolver(
             .parMap(10) { req ->
                 either {
                     req as WowEntityRequest
-                    val profile = blizzardClient.getCharacterProfile(
+                    val profile = blizzardClient.getClassicProfile(
                         req.region, req.realm, req.name
                     ).bind()
 
@@ -68,7 +68,7 @@ class WowHardcoreEntityResolver(
                         realm.category == "Hardcore" || realm.category == "Anniversary"
                     ) { NonHardcoreCharacter(req) }
 
-                    WowEnrichedEntityRequest(
+                    WowEntityRequest(
                         req.name,
                         req.region,
                         req.realm,
@@ -104,7 +104,7 @@ class WowHardcoreEntityResolver(
             val memberReqs = roster.members
                 .asSequence()
                 .filter { it.character.level >= 10 }
-                .map { WowEntityRequest(it.character.name.lowercase(), region, realm) }
+                .map { WowEntityRequest(it.character.name.lowercase(), region, it.character.realm?.slug ?: realm) }
                 .toList()
 
             Pair(roster, memberReqs)

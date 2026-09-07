@@ -22,6 +22,7 @@ class WowEntityDatabaseRepository(private val db: Database) :
         val name = text("name")
         val realm = text("realm")
         val region = text("region")
+        val blizzardId = long("blizzard_id").nullable()
 
         override val primaryKey = PrimaryKey(id)
     }
@@ -31,13 +32,13 @@ class WowEntityDatabaseRepository(private val db: Database) :
         row[WowEntities.name],
         row[WowEntities.region],
         row[WowEntities.realm],
-        null
+        row[WowEntities.blizzardId]
     )
 
     override suspend fun insert(entities: List<InsertEntityRequest>): Either<RepositoryError, List<Entity>> = either {
         val charsToInsert = entities.map { request ->
             ensure(request is WowEntityRequest) { RepositoryError("problem inserting $request for WOW") }
-            WowEntity(selectNextId(db), request.name.lowercase(), request.region, request.realm, 0)
+            WowEntity(selectNextId(db), request.name.lowercase(), request.region, request.realm, request.blizzardId)
         }
         newSuspendedTransaction(Dispatchers.IO, db) {
             transaction {
@@ -50,6 +51,7 @@ class WowEntityDatabaseRepository(private val db: Database) :
                         this[WowEntities.name] = it.name
                         this[WowEntities.region] = it.region
                         this[WowEntities.realm] = it.realm
+                        this[WowEntities.blizzardId] = it.blizzardId
                     }.map { resultRowToEntity(it) }
                     Either.Right(inserted)
                 } catch (e: SQLException) {
@@ -69,6 +71,7 @@ class WowEntityDatabaseRepository(private val db: Database) :
                     it[name] = entity.name.lowercase()
                     it[region] = entity.region
                     it[realm] = entity.realm
+                    it[blizzardId] = entity.blizzardId
                 })
 
                 else -> Either.Left(RepositoryError("problem updating $id: $entity for WOW"))
@@ -90,11 +93,16 @@ class WowEntityDatabaseRepository(private val db: Database) :
 
     override suspend fun get(entity: InsertEntityRequest): Entity? = newSuspendedTransaction(Dispatchers.IO, db) {
         entity as WowEntityRequest
-        WowEntities.selectAll().where {
-            WowEntities.name.eq(entity.name.lowercase())
-                .and(WowEntities.realm.eq(entity.realm))
-                .and(WowEntities.region.eq(entity.region))
-        }.map { resultRowToEntity(it) }.singleOrNull()
+        val query = if (entity.blizzardId != null) {
+            WowEntities.selectAll().where { WowEntities.blizzardId.eq(entity.blizzardId) }
+        } else {
+            WowEntities.selectAll().where {
+                WowEntities.name.eq(entity.name.lowercase())
+                    .and(WowEntities.realm.eq(entity.realm))
+                    .and(WowEntities.region.eq(entity.region))
+            }
+        }
+        query.map { resultRowToEntity(it) }.singleOrNull()
     }
 
     override suspend fun getAll(): List<Entity> = newSuspendedTransaction(Dispatchers.IO, db) {
@@ -120,6 +128,7 @@ class WowEntityDatabaseRepository(private val db: Database) :
                 this[WowEntities.name] = it.name.lowercase()
                 this[WowEntities.region] = it.region
                 this[WowEntities.realm] = it.realm
+                this[WowEntities.blizzardId] = it.blizzardId
             }
         }
         //This needs to be done to consume serial ids. Could be done in a different way but I don't dislike it.

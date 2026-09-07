@@ -23,7 +23,7 @@ class BlizzardHTTPClientTest {
     fun `getCharacterProfile returns successful response`() {
         runBlocking {
             givenAValidToken()
-            val result: Either<ClientError, GetWowCharacterResponse> = blizzardClient.getCharacterProfile(
+            val result: Either<ClientError, GetWowCharacterResponse> = blizzardClient.getClassicProfile(
                 "region", "realm", "name"
             )
             assertEquals(Either.Right(getWowCharacterResponse), result)

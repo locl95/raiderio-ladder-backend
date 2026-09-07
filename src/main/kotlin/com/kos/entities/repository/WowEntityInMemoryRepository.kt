@@ -48,8 +48,18 @@ class WowEntityInMemoryRepository(
         when (entity) {
             is WowEntityRequest -> {
                 val index = entities.indexOfFirst { it.id == id }
+                val current = entities[index]
                 entities.removeAt(index)
-                entities.add(index, WowEntity(id, entity.name.lowercase(), entity.region, entity.realm, null))
+                entities.add(
+                    index,
+                    WowEntity(
+                        id,
+                        entity.name.lowercase(),
+                        entity.region,
+                        entity.realm,
+                        entity.blizzardId ?: current.blizzardId
+                    )
+                )
                 Either.Right(1)
             }
 
@@ -70,7 +80,6 @@ class WowEntityInMemoryRepository(
     override suspend fun get(entity: InsertEntityRequest): Entity? {
         val normalized = when (entity) {
             is WowEntityRequest -> entity.copy(name = entity.name.lowercase())
-            is WowEnrichedEntityRequest -> entity.copy(name = entity.name.lowercase())
             else -> entity
         }
         return entities.find { normalized.same(it) }

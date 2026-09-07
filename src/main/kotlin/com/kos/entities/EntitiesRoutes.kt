@@ -6,6 +6,7 @@ import com.kos.common.error.BadRequest
 import com.kos.common.error.respondWithHandledError
 import com.kos.entities.domain.EntitiesExistRequest
 import com.kos.entities.domain.EntityRequest
+import com.kos.entities.domain.GuildExistsRequest
 import com.kos.entities.domain.LolEntityRequest
 import com.kos.entities.domain.WowEntityRequest
 import com.kos.plugins.UserWithActivities
@@ -81,6 +82,23 @@ fun Route.entitiesRouting(
                     userWithActivities?.activities.orEmpty(),
                     request.entities,
                     request.game
+                ).fold({
+                    call.respondWithHandledError(it)
+                }, {
+                    call.respond(HttpStatusCode.OK, it)
+                })
+            }
+
+            post("/exists/guild") {
+                val request = call.receive<GuildExistsRequest>()
+                val userWithActivities = call.principal<UserWithActivities>()
+
+                entitiesController.guildExists(
+                    userWithActivities?.name,
+                    userWithActivities?.activities.orEmpty(),
+                    request.name,
+                    request.region,
+                    request.realm
                 ).fold({
                     call.respondWithHandledError(it)
                 }, {

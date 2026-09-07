@@ -1,13 +1,6 @@
 package acceptance.steps
 
-import acceptance.ScenarioVariables
-import acceptance.SharedInfrastructure
-import acceptance.entityRequest
-import acceptance.entityRequestJson
-import acceptance.existingEntityRow
-import acceptance.newEntityRow
-import acceptance.toGame
-import acceptance.wowEntityRequest
+import acceptance.*
 import com.kos.datacache.DataCache
 import com.kos.datacache.repository.DataCacheDatabaseRepository
 import com.kos.entities.domain.LolEnrichedEntityRequest
@@ -24,13 +17,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
 import java.time.OffsetDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -184,6 +171,29 @@ class EntitiesSteps(private val scenarioVariables: ScenarioVariables) {
                 setBody(requestBody.toString())
             }
         }
+    }
+
+    @When("they check existence of guild {string} on realm {string} region {string}")
+    fun checkGuildExists(name: String, realm: String, region: String) {
+        val requestBody = buildJsonObject {
+            put("name", name)
+            put("realm", realm)
+            put("region", region)
+        }
+        scenarioVariables.response = runBlocking {
+            client.post("/api/entities/exists/guild") {
+                contentType(ContentType.Application.Json)
+                scenarioVariables.token?.let { bearerAuth(it) }
+                setBody(requestBody.toString())
+            }
+        }
+    }
+
+    @And("the guild exists in the response")
+    fun guildExistsInResponse() {
+        val body = runBlocking { scenarioVariables.response.bodyAsText() }
+        val guild = Json.parseToJsonElement(body).jsonObject["guild"]
+        assertNotNull(guild?.takeIf { it.toString() != "null" }, "Expected guild to be present in the response")
     }
 
     @And("{string} is in the {string} bucket")

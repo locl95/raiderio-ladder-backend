@@ -11,7 +11,9 @@ import com.kos.sources.lol.LolEntityUpdater
 import com.kos.sources.wow.WowGuildUpdater
 import com.kos.sources.wowhc.WowHardcoreGuildUpdater
 import com.kos.views.Game
+import com.kos.views.GuildArgs
 import com.kos.views.ViewExtraArguments
+import com.kos.views.WowExtraArguments
 
 data class EntitiesService(
     private val entitiesRepository: EntitiesRepository,
@@ -40,6 +42,14 @@ data class EntitiesService(
                     unchecked = unchecked.map { it.toResponse() }
                 )
             }
+    }
+
+    suspend fun guildExists(name: String, region: String, realm: String): Either<ServiceError, GuildExistsResponse> {
+        val guildRequest = WowEntityRequest(name, region, realm)
+        val extraArguments = WowExtraArguments(season = 0, guild = GuildArgs.EXISTENCE)
+
+        return resolveEntities(listOf(guildRequest), Game.WOW, extraArguments)
+            .map { resolved -> GuildExistsResponse(resolved.guild) }
     }
 
     suspend fun resolveEntities(

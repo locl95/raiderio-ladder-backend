@@ -8,8 +8,10 @@ import com.kos.clients.domain.WowCharacterResponse
 import com.kos.clients.domain.WowGuildResponse
 import com.kos.clients.domain.WowMemberResponse
 import com.kos.clients.raiderio.RaiderIoClient
+import com.kos.clients.domain.WowRosterMemberRealmResponse
 import com.kos.entities.domain.EntityRequest
 import com.kos.entities.domain.GuildPayload
+import com.kos.entities.domain.WowEntity
 import com.kos.entities.domain.WowEntityRequest
 import com.kos.entities.repository.EntitiesInMemoryRepository
 import com.kos.views.Game
@@ -17,6 +19,7 @@ import com.kos.views.repository.ViewsInMemoryRepository
 import kotlinx.coroutines.runBlocking
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
+import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import kotlin.test.Test
@@ -43,6 +46,18 @@ class WowGuildUpdaterTest {
 
     private suspend fun alreadyTracked(name: String, viewId: String): Long {
         val request = WowEntityRequest(name, region, realm)
+        val entity = entitiesRepository.insert(listOf(request), Game.WOW).fold({ error(it.toString()) }, { it }).first()
+        viewsRepository.associateEntitiesIdsToView(listOf(entity.id to null), viewId)
+        return entity.id
+    }
+
+    private suspend fun alreadyTrackedWithBlizzardId(
+        name: String,
+        memberBlizzardId: Long,
+        viewId: String,
+        memberRealm: String = realm
+    ): Long {
+        val request = WowEntityRequest(name, region, memberRealm, memberBlizzardId)
         val entity = entitiesRepository.insert(listOf(request), Game.WOW).fold({ error(it.toString()) }, { it }).first()
         viewsRepository.associateEntitiesIdsToView(listOf(entity.id to null), viewId)
         return entity.id
@@ -130,6 +145,41 @@ class WowGuildUpdaterTest {
     }
 
     @Test
+    fun `update detects a renamed and transferred member by blizzardId and updates it in place instead of duplicating it`() {
+        runBlocking {
+            val viewId = createGuildView("guild-view")
+
+            val trackedId = alreadyTrackedWithBlizzardId("oldname", 555L, viewId)
+
+            `when`(blizzardClient.getRetailGuildRoster(region, realm, guildName)).thenReturn(
+                Either.Right(
+                    GetWowRosterResponse(
+                        listOf(
+                            WowMemberResponse(
+                                WowCharacterResponse("newname", 90, 555L, WowRosterMemberRealmResponse("coilfang"))
+                            )
+                        ),
+                        WowGuildResponse(blizzardId)
+                    )
+                )
+            )
+
+            val errors = updater.update(listOf(GuildPayload(guildName, realm, region, blizzardId) to viewId))
+
+            assertEquals(emptyList(), errors)
+            verify(raiderIoClient, never()).getScore(org.mockito.kotlin.any())
+
+            val updated = entitiesRepository.get(trackedId, Game.WOW) as WowEntity
+            assertEquals("newname", updated.name)
+            assertEquals("coilfang", updated.realm)
+            assertEquals(555L, updated.blizzardId)
+
+            assertEquals(setOf(trackedId), viewsRepository.get(viewId)!!.entitiesIds.toSet())
+            assertEquals(1, entitiesRepository.get(Game.WOW).size)
+        }
+    }
+
+    @Test
     fun `update processes multiple guilds independently, each only touching its own view`() {
         runBlocking {
             val viewIdA = createGuildView("guild-view-a")
@@ -141,7 +191,7 @@ class WowGuildUpdaterTest {
             `when`(blizzardClient.getRetailGuildRoster(region, realm, "GuildA")).thenReturn(
                 Either.Right(
                     GetWowRosterResponse(
-                        listOf(WowMemberResponse(WowCharacterResponse(memberA.name, 90))),
+                        listOf(WowMemberResponse(WowCharacterResponse(memberA.name, 90, 111))),
                         WowGuildResponse(1L)
                     )
                 )
@@ -149,13 +199,13 @@ class WowGuildUpdaterTest {
             `when`(blizzardClient.getRetailGuildRoster(region, realm, "GuildB")).thenReturn(
                 Either.Right(
                     GetWowRosterResponse(
-                        listOf(WowMemberResponse(WowCharacterResponse(memberB.name, 90))),
+                        listOf(WowMemberResponse(WowCharacterResponse(memberB.name, 90, 222))),
                         WowGuildResponse(2L)
                     )
                 )
             )
-            `when`(raiderIoClient.getScore(memberA)).thenReturn(Either.Right(1500.0))
-            `when`(raiderIoClient.getScore(memberB)).thenReturn(Either.Right(1500.0))
+            `when`(raiderIoClient.getScore(memberA.copy(blizzardId = 111))).thenReturn(Either.Right(1500.0))
+            `when`(raiderIoClient.getScore(memberB.copy(blizzardId = 222))).thenReturn(Either.Right(1500.0))
 
             val errors = updater.update(
                 listOf(

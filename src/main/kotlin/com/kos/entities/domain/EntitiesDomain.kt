@@ -69,11 +69,24 @@ data class EntitiesExistResponse(
     val unchecked: List<EntityResponse>
 )
 
+@Serializable
 data class GuildPayload(
     val name: String,
     val realm: String,
     val region: String,
     val blizzardId: Long
+)
+
+@Serializable
+data class GuildExistsRequest(
+    val name: String,
+    val region: String,
+    val realm: String
+)
+
+@Serializable
+data class GuildExistsResponse(
+    val guild: GuildPayload?
 )
 
 data class ResolvedEntities(

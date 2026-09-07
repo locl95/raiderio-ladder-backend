@@ -7,18 +7,27 @@ data class Class(val `class`: String, val specs: List<Spec>)
 
 @Serializable
 data class WowEntityRequest(
-    override val name: String, val region: String, val realm: String, override val alias: String? = null
+    override val name: String,
+    val region: String,
+    val realm: String,
+    val blizzardId: Long? = null,
+    override val alias: String? = null
 ) :
     EntityRequest, InsertEntityRequest {
-    override fun toEntity(id: Long) = WowEntity(id, name, region, realm, null)
+    override fun toEntity(id: Long) = WowEntity(id, name, region, realm, blizzardId)
     override fun same(other: Entity): Boolean {
         return when (other) {
-            is WowEntity -> this.name == other.name && this.region == other.region && this.realm == other.realm
+            is WowEntity -> if (this.blizzardId != null && other.blizzardId != null) {
+                this.blizzardId == other.blizzardId
+            } else {
+                this.name == other.name && this.region == other.region && this.realm == other.realm
+            }
+
             else -> false
         }
     }
 
-    override fun toRequest(): EntityRequest = this
+    override fun toRequest(): EntityRequest = this.copy(blizzardId = null)
     override fun toResponse(): EntityResponse = WowEntityResponse(name, region, realm)
 }
 
@@ -28,26 +37,6 @@ data class WowEntityResponse(
     val region: String,
     val realm: String
 ) : EntityResponse
-
-data class WowEnrichedEntityRequest(
-    override val name: String,
-    val region: String,
-    val realm: String,
-    val blizzardId: Long?
-) : InsertEntityRequest {
-    override fun toEntity(id: Long): WowEntity {
-        return WowEntity(id, name, region, realm, blizzardId)
-    }
-
-    override fun same(other: Entity): Boolean {
-        return when (other) {
-            is WowEntity -> this.blizzardId == other.blizzardId
-            else -> false
-        }
-    }
-
-    override fun toRequest(): EntityRequest = WowEntityRequest(this.name, this.region, this.realm, null)
-}
 
 @Serializable
 data class WowEntity(

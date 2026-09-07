@@ -9,7 +9,7 @@ import com.kos.entities.repository.EntitiesState
 object EntitiesTestHelper {
     val emptyEntitiesState = EntitiesState(listOf(), listOf(), listOf())
     val basicWowRequest = WowEntityRequest("kakarona", "eu", "zuljin")
-    val basicWowEnrichedRequest = WowEnrichedEntityRequest("kakarona", "eu", "zuljin", 12345)
+    val basicWowRequestWithBlizzardId = WowEntityRequest("kakarona", "eu", "zuljin", 12345)
     val basicWowRequest2 = WowEntityRequest("layser", "eu", "zuljin")
     val basicLolEntity = LolEntity(1, "GTP ZeroMVPs", "WOW", "1", 1, 1)
     val basicLolEntity2 = LolEntity(2, "Sanxei", "EUW", "2", 2, 2)

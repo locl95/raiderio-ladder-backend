@@ -23,7 +23,6 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.serialization.json.JsonElement
 import java.net.URI
 import java.time.Duration
 
@@ -112,16 +111,6 @@ data class RaiderIoHTTPClient(
         }
     }
 
-    override suspend fun exists(wowEntityRequest: WowEntityRequest): Either<ClientError, Boolean> =
-        retryEitherWithFixedDelay(
-            retryConfig = retryConfig,
-            functionName = "raiderIoExists",
-        ) {
-            fetchFromApi<JsonElement> {
-                getRaiderIoProfile(wowEntityRequest.region, wowEntityRequest.realm, wowEntityRequest.name)
-            }.map { true }.orCharacterNotFound(false)
-        }
-
     override suspend fun getScore(wowEntityRequest: WowEntityRequest): Either<ClientError, Double> =
         retryEitherWithFixedDelay(
             retryConfig = retryConfig,
@@ -186,18 +175,6 @@ data class RaiderIoHTTPClient(
             }
         }
     }
-
-    private suspend fun getRaiderIoProfile(region: String, realm: String, name: String): HttpResponse =
-        apiGet(BASE_URI.toString() + CHARACTERS_PROFILE_PATH) {
-            headers {
-                append(HttpHeaders.Accept, "*/*")
-            }
-            url {
-                parameters.append("region", region)
-                parameters.append("realm", realm)
-                parameters.append("name", name)
-            }
-        }
 
     private val rateLimiter = RateLimiter.of(
         "raiderIoRateLimiter",

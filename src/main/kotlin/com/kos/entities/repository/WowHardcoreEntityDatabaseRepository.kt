@@ -2,6 +2,7 @@ package com.kos.entities.repository
 
 import arrow.core.Either
 import arrow.core.raise.either
+import arrow.core.raise.ensure
 import com.kos.common.WithState
 import com.kos.common.error.RepositoryError
 import com.kos.entities.domain.*
@@ -36,21 +37,14 @@ class WowHardcoreEntityDatabaseRepository(private val db: Database) :
 
     override suspend fun insert(entities: List<InsertEntityRequest>): Either<RepositoryError, List<Entity>> = either {
         val charsToInsert = entities.map { request ->
-            when (request) {
-                is WowEnrichedEntityRequest ->
-                    WowEntity(
-                        selectNextId(db),
-                        request.name.lowercase(),
-                        request.region,
-                        request.realm,
-                        request.blizzardId
-                    )
-
-                is WowEntityRequest ->
-                    WowEntity(selectNextId(db), request.name.lowercase(), request.region, request.realm, 0)
-
-                else -> raise(RepositoryError("problem inserting $request for WOW_HC"))
-            }
+            ensure(request is WowEntityRequest) { RepositoryError("problem inserting $request for WOW_HC") }
+            WowEntity(
+                selectNextId(db),
+                request.name.lowercase(),
+                request.region,
+                request.realm,
+                request.blizzardId ?: 0
+            )
         }
         newSuspendedTransaction(Dispatchers.IO, db) {
             transaction {
@@ -63,8 +57,7 @@ class WowHardcoreEntityDatabaseRepository(private val db: Database) :
                         this[WowHardcoreEntities.name] = it.name
                         this[WowHardcoreEntities.region] = it.region
                         this[WowHardcoreEntities.realm] = it.realm
-                        //TODO: at some point this should stop being nullable
-                        this[WowHardcoreEntities.blizzardId] = it.blizzardId ?: -1
+                        this[WowHardcoreEntities.blizzardId] = it.blizzardId ?: 0
                     }.map { resultRowToEntity(it) }
                     Either.Right(inserted)
                 } catch (e: SQLException) {
@@ -79,12 +72,12 @@ class WowHardcoreEntityDatabaseRepository(private val db: Database) :
 
     override suspend fun update(id: Long, entity: InsertEntityRequest): Either<RepositoryError, Int> =
         newSuspendedTransaction(Dispatchers.IO, db) {
-            //TODO: use enriched, no need to actualInsertedCharacter
             when (entity) {
                 is WowEntityRequest -> Either.Right(WowHardcoreEntities.update({ WowHardcoreEntities.id eq id }) {
                     it[name] = entity.name.lowercase()
                     it[region] = entity.region
                     it[realm] = entity.realm
+                    entity.blizzardId?.let { blizzardIdValue -> it[blizzardId] = blizzardIdValue }
                 })
 
                 else -> Either.Left(RepositoryError("problem updating $id: $entity for WOW_HC"))
@@ -107,11 +100,16 @@ class WowHardcoreEntityDatabaseRepository(private val db: Database) :
 
     override suspend fun get(entity: InsertEntityRequest): Entity? = newSuspendedTransaction(Dispatchers.IO, db) {
         entity as WowEntityRequest
-        WowHardcoreEntities.selectAll().where {
-            WowHardcoreEntities.name.eq(entity.name.lowercase())
-                .and(WowHardcoreEntities.realm.eq(entity.realm))
-                .and(WowHardcoreEntities.region.eq(entity.region))
-        }.map { resultRowToEntity(it) }.singleOrNull()
+        val query = if (entity.blizzardId != null) {
+            WowHardcoreEntities.selectAll().where { WowHardcoreEntities.blizzardId.eq(entity.blizzardId) }
+        } else {
+            WowHardcoreEntities.selectAll().where {
+                WowHardcoreEntities.name.eq(entity.name.lowercase())
+                    .and(WowHardcoreEntities.realm.eq(entity.realm))
+                    .and(WowHardcoreEntities.region.eq(entity.region))
+            }
+        }
+        query.map { resultRowToEntity(it) }.singleOrNull()
     }
 
     override suspend fun getAll(): List<Entity> = newSuspendedTransaction(Dispatchers.IO, db) {
