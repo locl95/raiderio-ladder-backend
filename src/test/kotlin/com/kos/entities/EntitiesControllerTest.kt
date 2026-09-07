@@ -9,6 +9,8 @@ import com.kos.common.error.ResolverNotFound
 import com.kos.datacache.DataCacheService
 import com.kos.entities.EntitiesTestHelper.basicWowRequest
 import com.kos.entities.domain.EntitiesExistResponse
+import com.kos.entities.domain.GuildExistsResponse
+import com.kos.entities.domain.GuildPayload
 import com.kos.views.Game
 import kotlinx.coroutines.runBlocking
 import org.mockito.Mockito.*
@@ -75,4 +77,41 @@ class EntitiesControllerTest {
             assertEquals(Either.Left(EntityError(ResolverNotFound(Game.WOW).error())), result)
         }
     }
+
+    @Test
+    fun `guildExists returns not authorized for an anonymous client`() {
+        runBlocking {
+            val result =
+                controller.guildExists(null, setOf(Activities.checkEntitiesExist), "Method", "eu", "twisting-nether")
+            assertEquals(Either.Left(NotAuthorized), result)
+        }
+    }
+
+    @Test
+    fun `guildExists returns not enough permissions when the client lacks the activity`() {
+        runBlocking {
+            val result = controller.guildExists("client", setOf(), "Method", "eu", "twisting-nether")
+            assertEquals(Either.Left(NotEnoughPermissions("client")), result)
+        }
+    }
+
+    @Test
+    fun `guildExists delegates to the service and returns its result`() {
+        runBlocking {
+            val response = GuildExistsResponse(GuildPayload("method", "twisting-nether", "eu", 999))
+            `when`(entitiesService.guildExists("Method", "eu", "twisting-nether"))
+                .thenReturn(Either.Right(response))
+
+            val result = controller.guildExists(
+                "client",
+                setOf(Activities.checkEntitiesExist),
+                "Method",
+                "eu",
+                "twisting-nether"
+            )
+
+            assertEquals(Either.Right(response), result)
+        }
+    }
+
 }

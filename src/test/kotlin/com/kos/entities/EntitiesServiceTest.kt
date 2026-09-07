@@ -6,6 +6,8 @@ import com.kos.clients.TimeoutError
 import com.kos.clients.blizzard.BlizzardClient
 import com.kos.clients.domain.GetPUUIDResponse
 import com.kos.clients.domain.GetSummonerResponse
+import com.kos.clients.domain.GetWowRosterResponse
+import com.kos.clients.domain.WowGuildResponse
 import com.kos.clients.raiderio.RaiderIoClient
 import com.kos.clients.riot.RiotClient
 import com.kos.datacache.BlizzardMockHelper
@@ -553,6 +555,55 @@ class EntitiesServiceTest {
                 assertEquals(listOf(), res.nonExisting)
                 assertEquals(listOf(basicWowRequest.toResponse()), res.unchecked)
             }
+        }
+    }
+
+    @Test
+    fun `guildExists returns the guild payload when the guild exists`() {
+        runBlocking {
+            `when`(blizzardClient.getRetailGuildRoster("eu", "twisting-nether", "Method")).thenReturn(
+                Either.Right(
+                    GetWowRosterResponse(listOf(), WowGuildResponse(999))
+                )
+            )
+
+            val entitiesService = createService(emptyEntitiesState)
+
+            val result = entitiesService.guildExists("Method", "eu", "twisting-nether")
+
+            result.onLeft { fail() }.onRight { res ->
+                assertEquals(GuildPayload("method", "twisting-nether", "eu", 999), res.guild)
+            }
+        }
+    }
+
+    @Test
+    fun `guildExists returns a null guild when it doesn't exist`() {
+        runBlocking {
+            `when`(blizzardClient.getRetailGuildRoster("eu", "twisting-nether", "Method"))
+                .thenReturn(Either.Left(HttpError(404, null)))
+
+            val entitiesService = createService(emptyEntitiesState)
+
+            val result = entitiesService.guildExists("Method", "eu", "twisting-nether")
+
+            result.onLeft { fail() }.onRight { res ->
+                assertEquals(null, res.guild)
+            }
+        }
+    }
+
+    @Test
+    fun `guildExists returns a Left when blizzard can't be reached`() {
+        runBlocking {
+            `when`(blizzardClient.getRetailGuildRoster("eu", "twisting-nether", "Method"))
+                .thenReturn(Either.Left(TimeoutError("Request timeout has expired")))
+
+            val entitiesService = createService(emptyEntitiesState)
+
+            val result = entitiesService.guildExists("Method", "eu", "twisting-nether")
+
+            result.onRight { fail() }
         }
     }
 

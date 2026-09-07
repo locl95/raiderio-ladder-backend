@@ -18,6 +18,7 @@ import com.kos.entities.EntityResolver
 import com.kos.entities.domain.*
 import com.kos.entities.repository.EntitiesRepository
 import com.kos.views.Game
+import com.kos.views.GuildArgs
 import com.kos.views.ViewExtraArguments
 import com.kos.views.WowExtraArguments
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -42,46 +43,61 @@ class WowEntityResolver(
         requested: List<EntityRequest>,
         extra: ViewExtraArguments?
     ): Either<ServiceError, ResolvedEntities> = either {
-        val args = extra as? WowExtraArguments
-        val (requestedEntities, guildRosterResponse) =
-            if (args?.isGuild == true) {
-                val guildReq = requested.first() as WowEntityRequest
+        val guild = (extra as? WowExtraArguments)?.guild
 
-                val (guildResponse, roster) = resolveRoster(guildReq.region, guildReq.realm, guildReq.name).bind()
-                Pair(roster, guildResponse)
-            } else {
-                Pair(requested, null)
-            }
-
-        val (existing, newRequests) = getCurrentAndNewEntities(repo, requestedEntities, Game.WOW)
-
-        val (entities, unchecked) = if (args?.isGuild == true) {
-            resolveGuildMembers(newRequests) to emptyList()
+        if (guild == null) {
+            val (existing, newRequests) = getCurrentAndNewEntities(repo, requested, Game.WOW)
+            val (entities, unchecked) = resolveCharacters(newRequests)
+            ResolvedEntities(
+                entities = entities,
+                existing = existing.map { it.value to it.alias },
+                unchecked = unchecked,
+                guild = null
+            )
         } else {
-            resolveCharacters(newRequests)
-        }
+            val guildReq = requested.first() as WowEntityRequest
 
-        ResolvedEntities(
-            entities = entities,
-            existing = existing.map { it.value to it.alias },
-            unchecked = unchecked,
-            guild = getGuildPayload(guildRosterResponse, requested.first())
-        )
+            when (guild) {
+                GuildArgs.EXISTENCE ->
+                    ResolvedEntities(
+                        entities = emptyList(),
+                        existing = emptyList(),
+                        unchecked = emptyList(),
+                        guild = getGuildPayloadIfExists(guildReq).bind()
+                    )
+
+                GuildArgs.RESOLVE -> {
+                    val (guildResponse, roster) = resolveRoster(guildReq.region, guildReq.realm, guildReq.name).bind()
+                    val (existing, newRequests) = getCurrentAndNewEntities(repo, roster, Game.WOW)
+
+                    ResolvedEntities(
+                        entities = resolveGuildMembers(newRequests),
+                        existing = existing.map { it.value to it.alias },
+                        unchecked = emptyList(),
+                        guild = getGuildPayload(guildResponse, guildReq)
+                    )
+                }
+            }
+        }
     }
 
-    fun getGuildPayload(guildRosterResponse: GetWowRosterResponse?, entityRequest: EntityRequest): GuildPayload? {
-        return when (guildRosterResponse) {
-            null -> null
-            else -> {
-                val guildReq = entityRequest as WowEntityRequest
-                GuildPayload(
-                    guildReq.name.lowercase(),
-                    guildReq.realm.lowercase(),
-                    guildReq.region.lowercase(),
-                    guildRosterResponse.guild.id
-                )
-            }
-        }
+    private suspend fun getGuildPayloadIfExists(guildReq: WowEntityRequest): Either<ServiceError, GuildPayload?> =
+        blizzardClient.getRetailGuildRoster(guildReq.region, guildReq.realm, guildReq.name).fold(
+            ifLeft = { error ->
+                if (error is HttpError && error.status == 404) Either.Right(null)
+                else Either.Left(error.toSyncProcessingError("GetRetailGuildRoster"))
+            },
+            ifRight = { roster -> Either.Right(getGuildPayload(roster, guildReq)) }
+        )
+
+    private fun getGuildPayload(guildRosterResponse: GetWowRosterResponse, entityRequest: EntityRequest): GuildPayload {
+        val guildReq = entityRequest as WowEntityRequest
+        return GuildPayload(
+            guildReq.name.lowercase(),
+            guildReq.realm.lowercase(),
+            guildReq.region.lowercase(),
+            guildRosterResponse.guild.id
+        )
     }
 
     suspend fun resolveRoster(

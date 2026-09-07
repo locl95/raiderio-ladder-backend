@@ -18,6 +18,7 @@ import com.kos.entities.domain.GuildPayload
 import com.kos.entities.domain.WowEntityRequest
 import com.kos.entities.repository.EntitiesInMemoryRepository
 import com.kos.entities.repository.EntitiesState
+import com.kos.views.GuildArgs
 import com.kos.views.WowExtraArguments
 import kotlinx.coroutines.runBlocking
 import org.mockito.Mockito.*
@@ -203,7 +204,7 @@ class WowEntityResolverTest {
     }
 
     private val guildRequest = WowEntityRequest("method", "eu", "twisting-nether")
-    private val guildExtraArguments = WowExtraArguments(isGuild = true, season = 0)
+    private val guildExtraArguments = WowExtraArguments(season = 0, guild = GuildArgs.RESOLVE)
 
     @Test
     fun `resolves a guild's roster, keeping max level members above the score threshold, and returns the guild payload`() {
@@ -450,6 +451,68 @@ class WowEntityResolverTest {
                 }
 
             verifyNoInteractions(raiderIoClient)
+        }
+    }
+
+    private val existenceOnlyArguments = WowExtraArguments(season = 0, guild = GuildArgs.EXISTENCE)
+
+    @Test
+    fun `resolve with EXISTENCE_ONLY returns the guild payload without resolving members`() {
+        runBlocking {
+            `when`(blizzardClient.getRetailGuildRoster(guildRequest.region, guildRequest.realm, guildRequest.name))
+                .thenReturn(
+                    Either.Right(
+                        GetWowRosterResponse(
+                            listOf(WowMemberResponse(WowCharacterResponse("kakarona", 90, 555))),
+                            WowGuildResponse(999)
+                        )
+                    )
+                )
+
+            val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
+            val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
+
+            resolver.resolve(listOf(guildRequest), existenceOnlyArguments)
+                .onLeft { fail() }
+                .onRight { res ->
+                    assertEquals(
+                        GuildPayload(guildRequest.name, guildRequest.realm, guildRequest.region, 999),
+                        res.guild
+                    )
+                    assertEquals(listOf(), res.entities)
+                    assertEquals(listOf(), res.existing)
+                    assertEquals(listOf(), res.unchecked)
+                }
+
+            verifyNoInteractions(raiderIoClient)
+        }
+    }
+
+    @Test
+    fun `resolve with EXISTENCE_ONLY returns a null guild when it doesn't exist`() {
+        runBlocking {
+            `when`(blizzardClient.getRetailGuildRoster(guildRequest.region, guildRequest.realm, guildRequest.name))
+                .thenReturn(Either.Left(HttpError(404, null)))
+
+            val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
+            val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
+
+            resolver.resolve(listOf(guildRequest), existenceOnlyArguments)
+                .onLeft { fail() }
+                .onRight { res -> assertEquals(null, res.guild) }
+        }
+    }
+
+    @Test
+    fun `resolve with EXISTENCE_ONLY returns a Left when blizzard can't be reached`() {
+        runBlocking {
+            `when`(blizzardClient.getRetailGuildRoster(guildRequest.region, guildRequest.realm, guildRequest.name))
+                .thenReturn(Either.Left(TimeoutError("Request timeout has expired")))
+
+            val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
+            val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
+
+            resolver.resolve(listOf(guildRequest), existenceOnlyArguments).onRight { fail() }
         }
     }
 }

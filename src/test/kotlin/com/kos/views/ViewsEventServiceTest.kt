@@ -82,7 +82,7 @@ class ViewsEventServiceTest {
         fun `creating a guild view for an already-tracked guild reuses its entities without calling blizzard or raiderio`() {
             runBlocking {
                 val existingViewId = "existing-guild-view"
-                val guildExtraArguments = WowExtraArguments(isGuild = true, season = 0)
+                val guildExtraArguments = WowExtraArguments(season = 0, guild = GuildArgs.RESOLVE)
                 val guildRequest = WowEntityRequest("method", "eu", "twisting-nether")
 
                 val existingView = SimpleView(

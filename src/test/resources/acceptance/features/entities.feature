@@ -41,3 +41,9 @@ Feature: Entities
     And "Sanxei" is in the "exist" bucket
     And "NonExistentEntity" is in the "nonExisting" bucket
     And "UncheckedEntity" is in the "unchecked" bucket
+
+  Scenario: Checking existence of a WOW guild returns its payload when it exists
+    Given a WOW guild roster is available from the Blizzard API
+    When they check existence of guild "Method" on realm "twisting-nether" region "eu"
+    Then the response status is 200
+    And the guild exists in the response

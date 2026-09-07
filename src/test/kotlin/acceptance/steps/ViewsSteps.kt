@@ -134,7 +134,7 @@ class ViewsSteps(private val scenarioVariables: ScenarioVariables) {
                 "extraArguments",
                 buildJsonObject {
                     put("type", "com.kos.views.WowExtraArguments")
-                    put("isGuild", true)
+                    put("guild", "RESOLVE")
                     put("season", 0)
                 }
             )

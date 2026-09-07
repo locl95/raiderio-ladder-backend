@@ -203,7 +203,7 @@ class ViewsService(
 
                 Game.WOW -> {
                     ensure(extra is WowExtraArguments) { ExtraArgumentsWrongType }
-                    if (extra.isGuild) ensure(request.entities.size == 1) { GuildViewMoreThanTwoEntities }
+                    if (extra.guild != null) ensure(request.entities.size == 1) { GuildViewMoreThanTwoEntities }
                 }
 
                 Game.LOL -> Unit
