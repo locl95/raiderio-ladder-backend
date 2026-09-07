@@ -182,7 +182,7 @@ class WowHardcoreSyncProcessorTest : SyncGameCharactersTestCommon() {
 
     private suspend fun stubWowHcEntitySync() {
         val entity = EntitiesTestHelper.basicWowEntity
-        `when`(blizzardClient.getCharacterProfile(entity.region, entity.realm, entity.name))
+        `when`(blizzardClient.getClassicProfile(entity.region, entity.realm, entity.name))
             .thenReturn(BlizzardMockHelper.getCharacterProfile(entity))
         `when`(blizzardClient.getCharacterMedia(entity.region, entity.realm, entity.name))
             .thenReturn(BlizzardMockHelper.getCharacterMedia(entity))

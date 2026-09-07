@@ -5,7 +5,7 @@ import com.kos.datacache.repository.DataCacheDatabaseRepository
 import com.kos.datacache.repository.DataCacheInMemoryRepository
 import com.kos.datacache.repository.DataCacheRepository
 import com.kos.entities.EntitiesTestHelper.basicLolEntityEnrichedRequest
-import com.kos.entities.EntitiesTestHelper.basicWowEnrichedRequest
+import com.kos.entities.EntitiesTestHelper.basicWowRequestWithBlizzardId
 import com.kos.entities.EntitiesTestHelper.basicWowEntity
 import com.kos.entities.EntitiesTestHelper.basicWowEntity2
 import com.kos.entities.EntitiesTestHelper.basicWowRequest
@@ -83,9 +83,10 @@ abstract class WowEntityRepositoryTestCommon<T> where T : GameEntityRepository, 
     }
 
     @Test
-    fun `inserting an enriched wow character request fails since retail WOW has no blizzardId`() {
+    fun `given an empty repository i can insert a wow character with a blizzardId`() {
         runBlocking {
-            assertTrue(repository.insert(listOf(basicWowEnrichedRequest)).isLeft())
+            val expected = listOf(basicWowEntity.copy(blizzardId = basicWowRequestWithBlizzardId.blizzardId))
+            repository.insert(listOf(basicWowRequestWithBlizzardId)).fold({ fail() }) { assertEquals(expected, it) }
         }
     }
 

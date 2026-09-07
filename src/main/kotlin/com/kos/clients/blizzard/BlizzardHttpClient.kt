@@ -6,7 +6,7 @@ import com.kos.clients.ClientError
 import com.kos.clients.Retry.retryEitherWithFixedDelay
 import com.kos.clients.RetryConfig
 import com.kos.clients.blizzard.BlizzardHttpClient.BlizzardHttpClientConstants.BATTLENET_NAMESPACE
-import com.kos.clients.blizzard.BlizzardHttpClient.BlizzardHttpClientConstants.DYNAMIC_CLASSIC1X_NANESPACE
+import com.kos.clients.blizzard.BlizzardHttpClient.BlizzardHttpClientConstants.DYNAMIC_CLASSIC1X_NAMESPACE
 import com.kos.clients.blizzard.BlizzardHttpClient.BlizzardHttpClientConstants.PROFILE_CLASSIC1X_EU_NAMESPACE
 import com.kos.clients.blizzard.BlizzardHttpClient.BlizzardHttpClientConstants.PROFILE_CLASSIC1X_NAMESPACE
 import com.kos.clients.blizzard.BlizzardHttpClient.BlizzardHttpClientConstants.STATIC_CLASSIC_NAMESPACE
@@ -37,28 +37,28 @@ class BlizzardHttpClient(
         const val PROFILE_CLASSIC1X_NAMESPACE = "profile-classic1x"
         const val BATTLENET_NAMESPACE = "Battlenet-Namespace"
         const val STATIC_CLASSIC_NAMESPACE = "static-classic"
-        const val DYNAMIC_CLASSIC1X_NANESPACE = "dynamic-classic1x"
+        const val DYNAMIC_CLASSIC1X_NAMESPACE = "dynamic-classic1x"
         const val PROFILE_CLASSIC1X_EU_NAMESPACE = "profile-classic1x-eu"
     }
 
     private val baseURI: (String) -> URI = { region -> URI("https://$region.api.blizzard.com") }
     private var token: Either<ClientError, TokenState>? = null
 
-    override suspend fun getCharacterProfile(
+    override suspend fun getClassicProfile(
         region: String,
         realm: String,
         character: String
     ): Either<ClientError, GetWowCharacterResponse> {
         return throttleRequest {
             either {
-                logger.debug("getCharacterProfile for $region $realm $character")
+                logger.debug("getClassicProfile for $region $realm $character")
                 val tokenResponse = getAndUpdateToken().bind()
                 val partialURI = URI("/profile/wow/character/$realm/${encodedName(character)}?locale=en_US")
 
 
                 retryEitherWithFixedDelay(
                     retryConfig = retryConfig,
-                    functionName = "getCharacterProfile",
+                    functionName = "getClassicProfile",
                 ) {
                     fetchFromApi<GetWowCharacterResponse> {
                         client.get((baseURI(region).toString() + partialURI.toString()).lowercase()) {
@@ -66,6 +66,36 @@ class BlizzardHttpClient(
                                 append(HttpHeaders.Authorization, "Bearer ${tokenResponse.tokenResponse.accessToken}")
                                 append(HttpHeaders.Accept, "*/*")
                                 append(BATTLENET_NAMESPACE, PROFILE_CLASSIC1X_NAMESPACE)
+                            }
+                        }
+                    }
+                }.bind()
+            }
+        }
+    }
+
+    override suspend fun getRetailProfile(
+        region: String,
+        realm: String,
+        character: String
+    ): Either<ClientError, GetWowCharacterResponse> {
+        return throttleRequest {
+            either {
+                logger.debug("getRetailProfile for $region $realm $character")
+                val tokenResponse = getAndUpdateToken().bind()
+                val namespace = "profile-$region"
+                val partialURI = URI("/profile/wow/character/$realm/${encodedName(character)}?locale=en_US")
+
+                retryEitherWithFixedDelay(
+                    retryConfig = retryConfig,
+                    functionName = "getRetailProfile",
+                ) {
+                    fetchFromApi<GetWowCharacterResponse> {
+                        client.get((baseURI(region).toString() + partialURI.toString()).lowercase()) {
+                            headers {
+                                append(HttpHeaders.Authorization, "Bearer ${tokenResponse.tokenResponse.accessToken}")
+                                append(HttpHeaders.Accept, "*/*")
+                                append(BATTLENET_NAMESPACE, namespace)
                             }
                         }
                     }
@@ -264,7 +294,7 @@ class BlizzardHttpClient(
                             headers {
                                 append(HttpHeaders.Authorization, "Bearer ${tokenResponse.tokenResponse.accessToken}")
                                 append(HttpHeaders.Accept, "*/*")
-                                append(BATTLENET_NAMESPACE, DYNAMIC_CLASSIC1X_NANESPACE)
+                                append(BATTLENET_NAMESPACE, DYNAMIC_CLASSIC1X_NAMESPACE)
                             }
                         }
                     }

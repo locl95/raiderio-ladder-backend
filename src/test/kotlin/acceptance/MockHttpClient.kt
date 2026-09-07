@@ -84,14 +84,20 @@ val mockHttpClient = HttpClient(MockEngine) {
 
                 path.contains("/profile/wow/character/") -> {
                     val status = MockConfig.blizzardProfileStatusOverride ?: HttpStatusCode.OK
-                    if (status == HttpStatusCode.OK)
-                        respond(
+                    val characterName = path.substringAfterLast("/")
+                    when {
+                        status != HttpStatusCode.OK -> respond("", status, json)
+                        characterName.equals("NonExistentEntity", ignoreCase = true) ->
+                            respond("", HttpStatusCode.NotFound, json)
+
+                        characterName.equals("UncheckedEntity", ignoreCase = true) ->
+                            respond("", HttpStatusCode.InternalServerError, json)
+                        else -> respond(
                             readResource("acceptance/files/responses/wow-hc/blizzard-character-profile-response.json"),
                             status,
                             json
                         )
-                    else
-                        respond("", status, json)
+                    }
                 }
 
                 path.contains("/mythic-plus/static-data") ->

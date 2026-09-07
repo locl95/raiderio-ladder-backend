@@ -3,7 +3,6 @@ package com.kos.entities
 import com.kos.entities.EntitiesTestHelper.basicLolEntity
 import com.kos.entities.EntitiesTestHelper.basicLolEntityEnrichedRequest
 import com.kos.entities.EntitiesTestHelper.basicWowEntity
-import com.kos.entities.domain.WowEnrichedEntityRequest
 import com.kos.entities.domain.WowEntityRequest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -134,43 +133,43 @@ class EntitiesDomainTest {
 
     @Test
     fun `same should return true for wow entities with identical Blizzard IDs`() {
-        val enrichedRequest = createWowCharacterEnrichedRequest(
+        val request = createWowEntityRequest(
             name = "Arthas",
             region = "Northrend",
             realm = "Icecrown",
             blizzardId = 12345L
         )
-        val entity = enrichedRequest.toEntity(1L)
-        val result = enrichedRequest.same(entity)
+        val entity = request.toEntity(1L)
+        val result = request.same(entity)
         assertTrue(result)
     }
 
     @Test
     fun `same should return false for wow entities with different Blizzard IDs`() {
-        val enrichedRequest = createWowCharacterEnrichedRequest(
+        val request = createWowEntityRequest(
             name = "Thrall",
             region = "Azeroth",
             realm = "Orgrimmar",
             blizzardId = 67890L
         )
-        val entity = enrichedRequest.toEntity(2L)
-        val result = enrichedRequest.same(entity.copy(blizzardId = 99999L))
+        val entity = request.toEntity(2L)
+        val result = request.same(entity.copy(blizzardId = 99999L))
         assertFalse(result)
     }
 
     @Test
-    fun `toCharacter should create a WowCharacter with the correct properties for WowCharacterEnrichedRequest`() {
+    fun `toCharacter should create a WowCharacter with the correct properties for a WowEntityRequest with a blizzardId`() {
         val entityName = "Sylvanas"
         val entityRegion = "Eastern Kingdoms"
         val entityRealm = "Silvermoon"
 
-        val enrichedRequest = createWowCharacterEnrichedRequest(
+        val request = createWowEntityRequest(
             name = "Sylvanas",
             region = "Eastern Kingdoms",
             realm = "Silvermoon",
             blizzardId = 54321L
         )
-        val entity = enrichedRequest.toEntity(1L)
+        val entity = request.toEntity(1L)
 
         assertEquals(1L, entity.id)
         assertEquals(entityName, entity.name)
@@ -179,10 +178,10 @@ class EntitiesDomainTest {
         assertEquals(54321L, entity.blizzardId)
     }
 
-    private fun createWowCharacterEnrichedRequest(
+    private fun createWowEntityRequest(
         name: String = "DefaultName",
         region: String = "DefaultRegion",
         realm: String = "DefaultRealm",
         blizzardId: Long? = 12345L
-    ) = WowEnrichedEntityRequest(name, region, realm, blizzardId)
+    ) = WowEntityRequest(name, region, realm, blizzardId)
 }

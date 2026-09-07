@@ -133,7 +133,7 @@ class WowHardcoreEntitySynchronizer(
                 return@either null
             }
 
-            val hardcoreData: HardcoreData = blizzardClient.getCharacterProfile(
+            val hardcoreData: HardcoreData = blizzardClient.getClassicProfile(
                 entity.region,
                 entity.realm,
                 entity.name
@@ -144,7 +144,7 @@ class WowHardcoreEntitySynchronizer(
                             handleNotFoundHardcoreCharacter(newestDataCacheEntry, entity)
 
                         else ->
-                            Either.Left(error.toSyncProcessingError("getCharacterProfile"))
+                            Either.Left(error.toSyncProcessingError("getClassicProfile"))
                     }.bind()
                 },
                 ifRight = { response ->

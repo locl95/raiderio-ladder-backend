@@ -2,6 +2,7 @@ package com.kos.views
 
 import arrow.core.Either
 import com.kos.clients.blizzard.BlizzardClient
+import com.kos.datacache.BlizzardMockHelper
 import com.kos.clients.domain.GetPUUIDResponse
 import com.kos.clients.domain.GetSummonerResponse
 import com.kos.clients.raiderio.RaiderIoClient
@@ -174,10 +175,14 @@ class ViewsEventServiceTest {
                 val request3 = WowEntityRequest("c", "r", "r")
                 val request4 = WowEntityRequest("d", "r", "r")
 
-                `when`(raiderIoClient.exists(request1)).thenReturn(Either.Right(true))
-                `when`(raiderIoClient.exists(request2)).thenReturn(Either.Right(true))
-                `when`(raiderIoClient.exists(request3)).thenReturn(Either.Right(true))
-                `when`(raiderIoClient.exists(request4)).thenReturn(Either.Right(true))
+                `when`(blizzardClient.getRetailProfile(request1.region, request1.realm, request1.name))
+                    .thenReturn(BlizzardMockHelper.getCharacterProfile(request1))
+                `when`(blizzardClient.getRetailProfile(request2.region, request2.realm, request2.name))
+                    .thenReturn(BlizzardMockHelper.getCharacterProfile(request2))
+                `when`(blizzardClient.getRetailProfile(request3.region, request3.realm, request3.name))
+                    .thenReturn(BlizzardMockHelper.getCharacterProfile(request3))
+                `when`(blizzardClient.getRetailProfile(request4.region, request4.realm, request4.name))
+                    .thenReturn(BlizzardMockHelper.getCharacterProfile(request4))
 
                 val (eventStore, viewsEventService) = createService(
                     ViewsState(
@@ -324,10 +329,14 @@ class ViewsEventServiceTest {
                 val request3 = WowEntityRequest("c", "r", "r")
                 val request4 = WowEntityRequest("d", "r", "r")
 
-                `when`(raiderIoClient.exists(request1)).thenReturn(Either.Right(true))
-                `when`(raiderIoClient.exists(request2)).thenReturn(Either.Right(true))
-                `when`(raiderIoClient.exists(request3)).thenReturn(Either.Right(true))
-                `when`(raiderIoClient.exists(request4)).thenReturn(Either.Right(true))
+                `when`(blizzardClient.getRetailProfile(request1.region, request1.realm, request1.name))
+                    .thenReturn(BlizzardMockHelper.getCharacterProfile(request1))
+                `when`(blizzardClient.getRetailProfile(request2.region, request2.realm, request2.name))
+                    .thenReturn(BlizzardMockHelper.getCharacterProfile(request2))
+                `when`(blizzardClient.getRetailProfile(request3.region, request3.realm, request3.name))
+                    .thenReturn(BlizzardMockHelper.getCharacterProfile(request3))
+                `when`(blizzardClient.getRetailProfile(request4.region, request4.realm, request4.name))
+                    .thenReturn(BlizzardMockHelper.getCharacterProfile(request4))
 
                 val (eventStore, viewsEventService) = createService(
                     ViewsState(

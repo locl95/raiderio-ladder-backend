@@ -80,7 +80,7 @@ class WowHardcoreEntitySynchronizerTest {
                 assertTrue(expectedHardcoreData.isDead)
             }
             assertEquals(1, dataCacheRepository.state().size)
-            verify(blizzardClient, times(0)).getCharacterProfile(
+            verify(blizzardClient, times(0)).getClassicProfile(
                 basicWowHardcoreEntity.region,
                 basicWowHardcoreEntity.realm,
                 basicWowHardcoreEntity.name
@@ -94,7 +94,7 @@ class WowHardcoreEntitySynchronizerTest {
         runBlocking {
 
             `when`(
-                blizzardClient.getCharacterProfile(
+                blizzardClient.getClassicProfile(
                     basicWowHardcoreEntity.region,
                     basicWowHardcoreEntity.realm,
                     basicWowHardcoreEntity.name
@@ -150,7 +150,7 @@ class WowHardcoreEntitySynchronizerTest {
         runBlocking {
 
             `when`(
-                blizzardClient.getCharacterProfile(
+                blizzardClient.getClassicProfile(
                     basicWowHardcoreEntity.region,
                     basicWowHardcoreEntity.realm,
                     basicWowHardcoreEntity.name
@@ -187,7 +187,7 @@ class WowHardcoreEntitySynchronizerTest {
         runBlocking {
 
             `when`(
-                blizzardClient.getCharacterProfile(
+                blizzardClient.getClassicProfile(
                     basicWowHardcoreEntity.region,
                     basicWowHardcoreEntity.realm,
                     basicWowHardcoreEntity.name
@@ -255,7 +255,7 @@ class WowHardcoreEntitySynchronizerTest {
         entity: WowEntity,
         characterProfile: Either<ClientError, GetWowCharacterResponse> = getCharacterProfile(entity)
     ) {
-        `when`(blizzardClient.getCharacterProfile(entity.region, entity.realm, entity.name))
+        `when`(blizzardClient.getClassicProfile(entity.region, entity.realm, entity.name))
             .thenReturn(characterProfile)
         `when`(blizzardClient.getCharacterMedia(entity.region, entity.realm, entity.name))
             .thenReturn(getCharacterMedia(entity))

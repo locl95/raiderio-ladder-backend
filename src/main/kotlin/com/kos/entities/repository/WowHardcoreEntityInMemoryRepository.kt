@@ -22,18 +22,6 @@ class WowHardcoreEntityInMemoryRepository(
         val initial = this.entities.toList()
         val inserted = entities.fold(listOf<Entity>()) { acc, it ->
             when (it) {
-                is WowEnrichedEntityRequest -> {
-                    val normalized = it.copy(name = it.name.lowercase())
-                    if (this.entities.any { entity -> normalized.same(entity) }) {
-                        this.entities.clear()
-                        this.entities.addAll(initial)
-                        return Either.Left(RepositoryError("Error inserting entity $it"))
-                    }
-                    val entity = normalized.toEntity(nextId())
-                    this.entities.add(entity)
-                    acc + entity
-                }
-
                 is WowEntityRequest -> {
                     val normalized = it.copy(name = it.name.lowercase())
                     if (this.entities.any { entity -> normalized.same(entity) }) {
@@ -41,7 +29,13 @@ class WowHardcoreEntityInMemoryRepository(
                         this.entities.addAll(initial)
                         return Either.Left(RepositoryError("Error inserting entity $it"))
                     }
-                    val entity = WowEntity(nextId(), normalized.name, normalized.region, normalized.realm, 0)
+                    val entity = WowEntity(
+                        nextId(),
+                        normalized.name,
+                        normalized.region,
+                        normalized.realm,
+                        normalized.blizzardId ?: 0
+                    )
                     this.entities.add(entity)
                     acc + entity
                 }
@@ -57,11 +51,10 @@ class WowHardcoreEntityInMemoryRepository(
     }
 
     override suspend fun update(id: Long, entity: InsertEntityRequest): Either<RepositoryError, Int> =
-        //TODO: use enriched, no need to actualInsertedCharacter
         when (entity) {
             is WowEntityRequest -> {
                 val index = entities.indexOfFirst { it.id == id }
-                val actualInsertedCharacter = entities[index]
+                val current = entities[index]
                 entities.removeAt(index)
                 entities.add(
                     index,
@@ -70,7 +63,7 @@ class WowHardcoreEntityInMemoryRepository(
                         entity.name.lowercase(),
                         entity.region,
                         entity.realm,
-                        actualInsertedCharacter.blizzardId
+                        entity.blizzardId ?: current.blizzardId
                     )
                 )
                 Either.Right(1)
@@ -93,7 +86,6 @@ class WowHardcoreEntityInMemoryRepository(
     override suspend fun get(entity: InsertEntityRequest): Entity? {
         val normalized = when (entity) {
             is WowEntityRequest -> entity.copy(name = entity.name.lowercase())
-            is WowEnrichedEntityRequest -> entity.copy(name = entity.name.lowercase())
             else -> entity
         }
         return entities.find { normalized.same(it) }

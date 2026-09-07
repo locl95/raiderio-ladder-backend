@@ -4,6 +4,7 @@ import arrow.core.Either
 import arrow.core.raise.either
 import arrow.core.raise.ensure
 import arrow.fx.coroutines.parMap
+import com.kos.clients.HttpError
 import com.kos.clients.blizzard.BlizzardClient
 import com.kos.clients.domain.GetWowRosterResponse
 import com.kos.clients.raiderio.RaiderIoClient
@@ -34,6 +35,7 @@ class WowEntityResolver(
 
     companion object {
         private const val MAX_CHARACTER_LEVEL = 90
+        private const val SCORE_CUTOFF = 1000
     }
 
     override suspend fun resolve(
@@ -41,25 +43,17 @@ class WowEntityResolver(
         extra: ViewExtraArguments?
     ): Either<ServiceError, ResolvedEntities> = either {
         val args = extra as? WowExtraArguments
-        val (effectiveRequests, guildPayload) = if (args?.isGuild == true) {
-            val guildReq = requested.first() as WowEntityRequest
+        val (requestedEntities, guildRosterResponse) =
+            if (args?.isGuild == true) {
+                val guildReq = requested.first() as WowEntityRequest
 
-            val (guildResponse, roster) = resolveRoster(guildReq.region, guildReq.realm, guildReq.name).bind()
+                val (guildResponse, roster) = resolveRoster(guildReq.region, guildReq.realm, guildReq.name).bind()
+                Pair(roster, guildResponse)
+            } else {
+                Pair(requested, null)
+            }
 
-            Pair(
-                roster,
-                GuildPayload(
-                    name = guildReq.name.lowercase(),
-                    realm = guildReq.realm.lowercase(),
-                    region = guildReq.region.lowercase(),
-                    blizzardId = guildResponse.guild.id
-                )
-            )
-        } else {
-            Pair(requested, null)
-        }
-
-        val (existing, newRequests) = getCurrentAndNewEntities(repo, effectiveRequests, Game.WOW)
+        val (existing, newRequests) = getCurrentAndNewEntities(repo, requestedEntities, Game.WOW)
 
         val (entities, unchecked) = if (args?.isGuild == true) {
             resolveGuildMembers(newRequests) to emptyList()
@@ -71,8 +65,23 @@ class WowEntityResolver(
             entities = entities,
             existing = existing.map { it.value to it.alias },
             unchecked = unchecked,
-            guild = guildPayload
+            guild = getGuildPayload(guildRosterResponse, requested.first())
         )
+    }
+
+    fun getGuildPayload(guildRosterResponse: GetWowRosterResponse?, entityRequest: EntityRequest): GuildPayload? {
+        return when (guildRosterResponse) {
+            null -> null
+            else -> {
+                val guildReq = entityRequest as WowEntityRequest
+                GuildPayload(
+                    guildReq.name.lowercase(),
+                    guildReq.realm.lowercase(),
+                    guildReq.region.lowercase(),
+                    guildRosterResponse.guild.id
+                )
+            }
+        }
     }
 
     suspend fun resolveRoster(
@@ -84,19 +93,26 @@ class WowEntityResolver(
             .mapLeft { it.toSyncProcessingError("GetRetailGuildRoster") }
             .bind()
 
-        val memberReqs = roster.members
+        val members = roster.members
             .asSequence()
             .filter { it.character.level >= MAX_CHARACTER_LEVEL }
-            .map { WowEntityRequest(it.character.name, region, realm) }
+            .map {
+                WowEntityRequest(
+                    it.character.name,
+                    region,
+                    it.character.realm?.slug ?: realm,
+                    it.character.id
+                )
+            }
             .toList()
 
-        Pair(roster, memberReqs)
+        Pair(roster, members)
     }
 
     suspend fun resolveGuildMembers(
         newRequests: List<EntityRequest>
     ): List<Pair<InsertEntityRequest, String?>> {
-        val (errors, oks) = newRequests.asFlow()
+        val (errors, resolved) = newRequests.asFlow()
             .parMap(10) { req ->
                 req as WowEntityRequest
                 either {
@@ -104,7 +120,7 @@ class WowEntityResolver(
                         .mapLeft { it.toSyncProcessingError("raiderIoScore") }
                         .bind()
 
-                    ensure(score > 0.0) { NotCompetitiveCharacter(req) }
+                    ensure(score >= SCORE_CUTOFF) { NotCompetitiveCharacter(req) }
 
                     req to req.alias
                 }.mapLeft { req to it }
@@ -116,7 +132,7 @@ class WowEntityResolver(
             logger.warn("Skipping guild member ${req.name}-${req.realm}: ${error.error()}")
         }
 
-        return oks
+        return resolved
     }
 
     private suspend fun resolveCharacters(
@@ -125,19 +141,20 @@ class WowEntityResolver(
         val (unchecked, checked) = newRequests.asFlow()
             .parMap(10) { req ->
                 req as WowEntityRequest
-                either {
-                    val exists = raiderioClient.exists(req)
-                        .mapLeft { it.toSyncProcessingError("raiderIoExists") }
-                        .bind()
-                    req to exists
-                }.mapLeft { req to it }
+                blizzardClient.getRetailProfile(req.region, req.realm, req.name).fold(
+                    ifLeft = { error ->
+                        if (error is HttpError && error.status == 404) Either.Right(req to null)
+                        else Either.Left(req to error.toSyncProcessingError("getRetailProfile"))
+                    },
+                    ifRight = { profile -> Either.Right(req to profile.id) }
+                )
             }
             .toList()
             .split()
 
         val entities = checked.collect(
-            filter = { it.second },
-            map = { it.first to it.first.alias }
+            filter = { it.second != null },
+            map = { it.first.copy(blizzardId = it.second) to it.first.alias }
         )
 
         return entities to unchecked

@@ -1,13 +1,16 @@
 package com.kos.sources.wow
 
 import arrow.core.Either
+import com.kos.clients.HttpError
 import com.kos.clients.TimeoutError
 import com.kos.clients.blizzard.BlizzardClient
 import com.kos.clients.domain.GetWowRosterResponse
 import com.kos.clients.domain.WowCharacterResponse
 import com.kos.clients.domain.WowGuildResponse
 import com.kos.clients.domain.WowMemberResponse
+import com.kos.clients.domain.WowRosterMemberRealmResponse
 import com.kos.clients.raiderio.RaiderIoClient
+import com.kos.datacache.BlizzardMockHelper
 import com.kos.entities.EntitiesTestHelper.basicWowEntity
 import com.kos.entities.EntitiesTestHelper.basicWowRequest
 import com.kos.entities.EntitiesTestHelper.basicWowRequest2
@@ -27,9 +30,11 @@ class WowEntityResolverTest {
     private val blizzardClient = mock(BlizzardClient::class.java)
 
     @Test
-    fun `resolves a new character that exists in raiderio`() {
+    fun `resolves a new character that exists in blizzard`() {
         runBlocking {
-            `when`(raiderIoClient.exists(basicWowRequest)).thenReturn(Either.Right(true))
+            `when`(
+                blizzardClient.getRetailProfile(basicWowRequest.region, basicWowRequest.realm, basicWowRequest.name)
+            ).thenReturn(BlizzardMockHelper.getCharacterProfile(basicWowEntity))
 
             val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
             val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
@@ -37,7 +42,17 @@ class WowEntityResolverTest {
             resolver.resolve(listOf(basicWowRequest), null)
                 .onLeft { fail() }
                 .onRight { res ->
-                    assertEquals(listOf(basicWowRequest to null), res.entities)
+                    assertEquals(
+                        listOf(
+                            WowEntityRequest(
+                                basicWowRequest.name,
+                                basicWowRequest.region,
+                                basicWowRequest.realm,
+                                basicWowEntity.id
+                            ) to null
+                        ),
+                        res.entities
+                    )
                     assertEquals(listOf(), res.existing)
                     assertEquals(listOf(), res.unchecked)
                 }
@@ -45,9 +60,11 @@ class WowEntityResolverTest {
     }
 
     @Test
-    fun `does not resolve a new character that does not exist in raiderio`() {
+    fun `does not resolve a new character that does not exist in blizzard`() {
         runBlocking {
-            `when`(raiderIoClient.exists(basicWowRequest)).thenReturn(Either.Right(false))
+            `when`(
+                blizzardClient.getRetailProfile(basicWowRequest.region, basicWowRequest.realm, basicWowRequest.name)
+            ).thenReturn(Either.Left(HttpError(404, null)))
 
             val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
             val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
@@ -62,7 +79,7 @@ class WowEntityResolverTest {
     }
 
     @Test
-    fun `a character already in the repository is returned as existing without calling raiderio`() {
+    fun `a character already in the repository is returned as existing without calling blizzard`() {
         runBlocking {
             val repo =
                 EntitiesInMemoryRepository().withState(EntitiesState(listOf(basicWowEntity), listOf(), listOf()))
@@ -75,6 +92,22 @@ class WowEntityResolverTest {
                     assertEquals(listOf(), res.entities)
                 }
 
+            verifyNoInteractions(blizzardClient)
+        }
+    }
+
+    @Test
+    fun `a non-guild resolve does not call raiderio`() {
+        runBlocking {
+            `when`(
+                blizzardClient.getRetailProfile(basicWowRequest.region, basicWowRequest.realm, basicWowRequest.name)
+            ).thenReturn(BlizzardMockHelper.getCharacterProfile(basicWowEntity))
+
+            val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
+            val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
+
+            resolver.resolve(listOf(basicWowRequest), null).onLeft { fail() }
+
             verifyNoInteractions(raiderIoClient)
         }
     }
@@ -82,23 +115,41 @@ class WowEntityResolverTest {
     @Test
     fun `resolves a batch of new characters concurrently, keeping only the ones that exist`() {
         runBlocking {
-            `when`(raiderIoClient.exists(basicWowRequest)).thenReturn(Either.Right(true))
-            `when`(raiderIoClient.exists(basicWowRequest2)).thenReturn(Either.Right(false))
+            `when`(
+                blizzardClient.getRetailProfile(basicWowRequest.region, basicWowRequest.realm, basicWowRequest.name)
+            ).thenReturn(BlizzardMockHelper.getCharacterProfile(basicWowEntity))
+            `when`(
+                blizzardClient.getRetailProfile(basicWowRequest2.region, basicWowRequest2.realm, basicWowRequest2.name)
+            ).thenReturn(Either.Left(HttpError(404, null)))
 
             val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
             val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
 
             resolver.resolve(listOf(basicWowRequest, basicWowRequest2), null)
                 .onLeft { fail() }
-                .onRight { res -> assertEquals(listOf(basicWowRequest to null), res.entities) }
+                .onRight { res ->
+                    assertEquals(
+                        listOf(
+                            WowEntityRequest(
+                                basicWowRequest.name,
+                                basicWowRequest.region,
+                                basicWowRequest.realm,
+                                basicWowEntity.id
+                            ) to null
+                        ),
+                        res.entities
+                    )
+                }
         }
     }
 
     @Test
-    fun `resolve reports a raiderio failure as unchecked instead of lying that the character doesn't exist`() {
+    fun `resolve reports a blizzard failure as unchecked instead of lying that the character doesn't exist`() {
         runBlocking {
             val timeoutError = TimeoutError("Request timeout has expired")
-            `when`(raiderIoClient.exists(basicWowRequest)).thenReturn(Either.Left(timeoutError))
+            `when`(
+                blizzardClient.getRetailProfile(basicWowRequest.region, basicWowRequest.realm, basicWowRequest.name)
+            ).thenReturn(Either.Left(timeoutError))
 
             val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
             val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
@@ -119,9 +170,15 @@ class WowEntityResolverTest {
             val timeoutError = TimeoutError("Request timeout has expired")
             val basicWowRequest3 = basicWowRequest2.copy(name = "thirdcharacter")
 
-            `when`(raiderIoClient.exists(basicWowRequest)).thenReturn(Either.Right(true))
-            `when`(raiderIoClient.exists(basicWowRequest2)).thenReturn(Either.Right(false))
-            `when`(raiderIoClient.exists(basicWowRequest3)).thenReturn(Either.Left(timeoutError))
+            `when`(
+                blizzardClient.getRetailProfile(basicWowRequest.region, basicWowRequest.realm, basicWowRequest.name)
+            ).thenReturn(BlizzardMockHelper.getCharacterProfile(basicWowEntity))
+            `when`(
+                blizzardClient.getRetailProfile(basicWowRequest2.region, basicWowRequest2.realm, basicWowRequest2.name)
+            ).thenReturn(Either.Left(HttpError(404, null)))
+            `when`(
+                blizzardClient.getRetailProfile(basicWowRequest3.region, basicWowRequest3.realm, basicWowRequest3.name)
+            ).thenReturn(Either.Left(timeoutError))
 
             val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
             val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
@@ -129,7 +186,17 @@ class WowEntityResolverTest {
             resolver.resolve(listOf(basicWowRequest, basicWowRequest2, basicWowRequest3), null)
                 .onLeft { fail() }
                 .onRight { res ->
-                    assertEquals(listOf(basicWowRequest to null), res.entities)
+                    assertEquals(
+                        listOf(
+                            WowEntityRequest(
+                                basicWowRequest.name,
+                                basicWowRequest.region,
+                                basicWowRequest.realm,
+                                basicWowEntity.id
+                            ) to null
+                        ),
+                        res.entities
+                    )
                     assertEquals(listOf(basicWowRequest3), res.unchecked.map { it.first })
                 }
         }
@@ -147,12 +214,12 @@ class WowEntityResolverTest {
                 .thenReturn(
                     Either.Right(
                         GetWowRosterResponse(
-                            listOf(WowMemberResponse(WowCharacterResponse(member.name, 90))),
+                            listOf(WowMemberResponse(WowCharacterResponse(member.name, 90, 555))),
                             WowGuildResponse(999)
                         )
                     )
                 )
-            `when`(raiderIoClient.getScore(member)).thenReturn(Either.Right(1500.0))
+            `when`(raiderIoClient.getScore(member.copy(blizzardId = 555))).thenReturn(Either.Right(1500.0))
 
             val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
             val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
@@ -160,11 +227,53 @@ class WowEntityResolverTest {
             resolver.resolve(listOf(guildRequest), guildExtraArguments)
                 .onLeft { fail() }
                 .onRight { res ->
-                    assertEquals(listOf(member to null), res.entities)
+                    assertEquals(
+                        listOf(WowEntityRequest(member.name, member.region, member.realm, 555) to null),
+                        res.entities
+                    )
                     assertEquals(listOf(), res.unchecked)
                     assertEquals(
                         GuildPayload(guildRequest.name, guildRequest.realm, guildRequest.region, 999),
                         res.guild
+                    )
+                }
+        }
+    }
+
+    @Test
+    fun `resolves a guild member on a different connected realm using their own realm, not the guild's`() {
+        runBlocking {
+            val member = WowEntityRequest("xesevi", guildRequest.region, "coilfang")
+
+            `when`(blizzardClient.getRetailGuildRoster(guildRequest.region, guildRequest.realm, guildRequest.name))
+                .thenReturn(
+                    Either.Right(
+                        GetWowRosterResponse(
+                            listOf(
+                                WowMemberResponse(
+                                    WowCharacterResponse(
+                                        member.name,
+                                        90,
+                                        105161061,
+                                        WowRosterMemberRealmResponse("coilfang")
+                                    )
+                                )
+                            ),
+                            WowGuildResponse(999)
+                        )
+                    )
+                )
+            `when`(raiderIoClient.getScore(member.copy(blizzardId = 105161061))).thenReturn(Either.Right(1500.0))
+
+            val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
+            val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
+
+            resolver.resolve(listOf(guildRequest), guildExtraArguments)
+                .onLeft { fail() }
+                .onRight { res ->
+                    assertEquals(
+                        listOf(WowEntityRequest(member.name, member.region, member.realm, 105161061) to null),
+                        res.entities
                     )
                 }
         }
@@ -180,12 +289,12 @@ class WowEntityResolverTest {
                 .thenReturn(
                     Either.Right(
                         GetWowRosterResponse(
-                            listOf(WowMemberResponse(WowCharacterResponse(member.name, 90))),
+                            listOf(WowMemberResponse(WowCharacterResponse(member.name, 90, 555))),
                             WowGuildResponse(999)
                         )
                     )
                 )
-            `when`(raiderIoClient.getScore(member)).thenReturn(Either.Right(1500.0))
+            `when`(raiderIoClient.getScore(member.copy(blizzardId = 555))).thenReturn(Either.Right(1500.0))
 
             val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
             val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
@@ -205,7 +314,7 @@ class WowEntityResolverTest {
                 .thenReturn(
                     Either.Right(
                         GetWowRosterResponse(
-                            listOf(WowMemberResponse(WowCharacterResponse("lowlevel", 79))),
+                            listOf(WowMemberResponse(WowCharacterResponse("lowlevel", 79, 111))),
                             WowGuildResponse(999)
                         )
                     )
@@ -234,12 +343,12 @@ class WowEntityResolverTest {
                 .thenReturn(
                     Either.Right(
                         GetWowRosterResponse(
-                            listOf(WowMemberResponse(WowCharacterResponse(member.name, 90))),
+                            listOf(WowMemberResponse(WowCharacterResponse(member.name, 90, 222))),
                             WowGuildResponse(999)
                         )
                     )
                 )
-            `when`(raiderIoClient.getScore(member)).thenReturn(Either.Right(0.0))
+            `when`(raiderIoClient.getScore(member.copy(blizzardId = 222))).thenReturn(Either.Right(0.0))
 
             val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
             val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
@@ -254,7 +363,7 @@ class WowEntityResolverTest {
     }
 
     @Test
-    fun `a new guild member with any score passes the filter`() {
+    fun `a new guild member with a score at the cutoff passes the filter`() {
         runBlocking {
             val member = WowEntityRequest("borderline", guildRequest.region, guildRequest.realm)
 
@@ -262,12 +371,12 @@ class WowEntityResolverTest {
                 .thenReturn(
                     Either.Right(
                         GetWowRosterResponse(
-                            listOf(WowMemberResponse(WowCharacterResponse(member.name, 90))),
+                            listOf(WowMemberResponse(WowCharacterResponse(member.name, 90, 777))),
                             WowGuildResponse(999)
                         )
                     )
                 )
-            `when`(raiderIoClient.getScore(member)).thenReturn(Either.Right(0.1))
+            `when`(raiderIoClient.getScore(member.copy(blizzardId = 777))).thenReturn(Either.Right(1000.0))
 
             val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
             val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
@@ -275,7 +384,10 @@ class WowEntityResolverTest {
             resolver.resolve(listOf(guildRequest), guildExtraArguments)
                 .onLeft { fail() }
                 .onRight { res ->
-                    assertEquals(listOf(member to null), res.entities)
+                    assertEquals(
+                        listOf(WowEntityRequest(member.name, member.region, member.realm, 777) to null),
+                        res.entities
+                    )
                     assertEquals(listOf(), res.unchecked)
                 }
         }
@@ -291,12 +403,12 @@ class WowEntityResolverTest {
                 .thenReturn(
                     Either.Right(
                         GetWowRosterResponse(
-                            listOf(WowMemberResponse(WowCharacterResponse(member.name, 90))),
+                            listOf(WowMemberResponse(WowCharacterResponse(member.name, 90, 333))),
                             WowGuildResponse(999)
                         )
                     )
                 )
-            `when`(raiderIoClient.getScore(member)).thenReturn(Either.Left(timeoutError))
+            `when`(raiderIoClient.getScore(member.copy(blizzardId = 333))).thenReturn(Either.Left(timeoutError))
 
             val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
             val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
@@ -320,7 +432,7 @@ class WowEntityResolverTest {
                 .thenReturn(
                     Either.Right(
                         GetWowRosterResponse(
-                            listOf(WowMemberResponse(WowCharacterResponse(member.name, 90))),
+                            listOf(WowMemberResponse(WowCharacterResponse(member.name, 90, 444))),
                             WowGuildResponse(999)
                         )
                     )
@@ -338,20 +450,6 @@ class WowEntityResolverTest {
                 }
 
             verifyNoInteractions(raiderIoClient)
-        }
-    }
-
-    @Test
-    fun `a non-guild resolve does not call blizzard`() {
-        runBlocking {
-            `when`(raiderIoClient.exists(basicWowRequest)).thenReturn(Either.Right(true))
-
-            val repo = EntitiesInMemoryRepository().withState(EntitiesState(listOf(), listOf(), listOf()))
-            val resolver = WowEntityResolver(repo, raiderIoClient, blizzardClient)
-
-            resolver.resolve(listOf(basicWowRequest), null).onLeft { fail() }
-
-            verifyNoInteractions(blizzardClient)
         }
     }
 }

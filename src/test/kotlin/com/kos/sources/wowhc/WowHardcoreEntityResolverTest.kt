@@ -22,7 +22,7 @@ class WowHardcoreEntityResolverTest {
     fun `resolves a new character on a hardcore realm`() {
         runBlocking {
             `when`(
-                blizzardClient.getCharacterProfile(basicWowRequest.region, basicWowRequest.realm, basicWowRequest.name)
+                blizzardClient.getClassicProfile(basicWowRequest.region, basicWowRequest.realm, basicWowRequest.name)
             ).thenReturn(BlizzardMockHelper.getCharacterProfile(basicWowRequest))
             `when`(blizzardClient.getRealm(basicWowRequest.region, 5220)).thenReturn(Either.Right(hardcoreRealm))
 
@@ -42,7 +42,7 @@ class WowHardcoreEntityResolverTest {
     fun `does not resolve a character from a non hardcore realm`() {
         runBlocking {
             `when`(
-                blizzardClient.getCharacterProfile(basicWowRequest.region, basicWowRequest.realm, basicWowRequest.name)
+                blizzardClient.getClassicProfile(basicWowRequest.region, basicWowRequest.realm, basicWowRequest.name)
             ).thenReturn(BlizzardMockHelper.getCharacterProfile(basicWowRequest))
             `when`(blizzardClient.getRealm(basicWowRequest.region, 5220)).thenReturn(Either.Right(notHardcoreRealm))
 

@@ -66,7 +66,7 @@ class UpdateWowHardcoreGuildsTaskRunnerTest {
                     )
                 )
             )
-        `when`(blizzardClient.getCharacterProfile(region, realm, character.toLowerCasePreservingASCIIRules()))
+        `when`(blizzardClient.getClassicProfile(region, realm, character.toLowerCasePreservingASCIIRules()))
             .thenReturn(Either.Right(getWowCharacterResponse.copy(name = character, guild = guild)))
         `when`(blizzardClient.getRealm(region, 5220))
             .thenReturn(Either.Right(GetWowRealmResponse("Hardcore")))

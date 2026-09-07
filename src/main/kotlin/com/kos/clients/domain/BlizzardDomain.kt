@@ -606,9 +606,16 @@ data class HardcoreData(
 }
 
 @Serializable
+data class WowRosterMemberRealmResponse(
+    val slug: String
+)
+
+@Serializable
 data class WowCharacterResponse(
     val name: String,
-    val level: Int
+    val level: Int,
+    val id: Long? = null,
+    val realm: WowRosterMemberRealmResponse? = null
 )
 
 @Serializable

@@ -71,7 +71,6 @@ class LolEntityInMemoryRepository(
     override suspend fun get(entity: InsertEntityRequest): Entity? {
         val normalized = when (entity) {
             is WowEntityRequest -> entity.copy(name = entity.name.lowercase())
-            is WowEnrichedEntityRequest -> entity.copy(name = entity.name.lowercase())
             else -> entity
         }
         return entities.find { normalized.same(it) }

@@ -6,12 +6,11 @@ import com.kos.datacache.repository.DataCacheDatabaseRepository
 import com.kos.datacache.repository.DataCacheInMemoryRepository
 import com.kos.datacache.repository.DataCacheRepository
 import com.kos.entities.EntitiesTestHelper.basicLolEntityEnrichedRequest
-import com.kos.entities.EntitiesTestHelper.basicWowEnrichedRequest
+import com.kos.entities.EntitiesTestHelper.basicWowRequestWithBlizzardId
 import com.kos.entities.EntitiesTestHelper.basicWowHardcoreEntity
 import com.kos.entities.EntitiesTestHelper.basicWowRequest
 import com.kos.entities.domain.EntityRequest
 import com.kos.entities.domain.InsertEntityRequest
-import com.kos.entities.domain.WowEnrichedEntityRequest
 import com.kos.entities.domain.WowEntity
 import com.kos.entities.domain.WowEntityRequest
 import com.kos.entities.repository.GameEntityRepository
@@ -40,7 +39,7 @@ abstract class WowHardcoreEntityRepositoryTestCommon<T> where T : GameEntityRepo
     fun `given an empty repository i can insert wow hardcore characters`() {
         runBlocking {
             val expected = listOf(basicWowHardcoreEntity)
-            repository.insert(listOf(basicWowEnrichedRequest)).fold({ fail() }) { assertEquals(expected, it) }
+            repository.insert(listOf(basicWowRequestWithBlizzardId)).fold({ fail() }) { assertEquals(expected, it) }
         }
     }
 
@@ -50,7 +49,7 @@ abstract class WowHardcoreEntityRepositoryTestCommon<T> where T : GameEntityRepo
             repository.withState(listOf(basicWowHardcoreEntity))
             repository.insert(
                 listOf(
-                    WowEnrichedEntityRequest(
+                    WowEntityRequest(
                         basicWowHardcoreEntity.name,
                         basicWowHardcoreEntity.region,
                         basicWowHardcoreEntity.realm,
@@ -70,7 +69,7 @@ abstract class WowHardcoreEntityRepositoryTestCommon<T> where T : GameEntityRepo
     }
 
     @Test
-    fun `inserting an unenriched wow character request is also accepted, defaulting blizzardId to 0`() {
+    fun `inserting a wow character request without a blizzardId is also accepted, defaulting blizzardId to 0`() {
         runBlocking {
             val expected = basicWowHardcoreEntity.copy(blizzardId = 0)
             repository.insert(listOf(basicWowRequest)).fold({ fail() }) { assertEquals(listOf(expected), it) }
