@@ -106,7 +106,7 @@ class LolEntitySynchronizer(
                     Duration.between(start, OffsetDateTime.now()).toMinutes()
                 } minutes"
             )
-            logger.debug("dynamic match cache hit rate: ${matchCache.hitRate}%")
+            logger.debug("dynamic match cache hit rate: ${"%.2f".format(matchCache.hitRate)}%")
             errorsList
         }
 

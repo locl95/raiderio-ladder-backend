@@ -339,12 +339,8 @@ data class RunDetailsRosterEntry(
 
 @Serializable
 data class RunDetailsDeath(
-    @SerialName("character_id")
-    val characterId: Long,
     @SerialName("approximate_died_at")
-    val approximateDiedAt: Int,
-    @SerialName("logged_encounter_id")
-    val loggedEncounterId: Int? = null
+    val approximateDiedAt: Int
 )
 
 @Serializable
@@ -356,7 +352,6 @@ data class RunDetails(
     @SerialName("logged_details")
     val loggedDetails: LoggedDetails? = null
 ) {
-    val deathCount: Int get() = loggedDetails?.deaths?.size ?: 0
 }
 
 

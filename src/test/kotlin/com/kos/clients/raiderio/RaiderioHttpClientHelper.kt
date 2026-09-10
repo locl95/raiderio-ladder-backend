@@ -3,7 +3,6 @@ package com.kos.clients.raiderio
 import com.kos.clients.domain.*
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
-import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -279,9 +278,9 @@ object RaiderIoHttpClientHelper {
         ),
         loggedDetails = LoggedDetails(
             deaths = listOf(
-                RunDetailsDeath(291586163L, 1441041, 3268098),
-                RunDetailsDeath(301703640L, 1446140, 3268098),
-                RunDetailsDeath(113975488L, 914295, null)
+                RunDetailsDeath(1441041),
+                RunDetailsDeath(1446140),
+                RunDetailsDeath(914295)
             )
         )
     )

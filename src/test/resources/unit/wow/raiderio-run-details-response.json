@@ -60,19 +60,13 @@
   "logged_details": {
     "deaths": [
       {
-        "character_id": 291586163,
-        "approximate_died_at": 1441041,
-        "logged_encounter_id": 3268098
+        "approximate_died_at": 1441041
       },
       {
-        "character_id": 301703640,
-        "approximate_died_at": 1446140,
-        "logged_encounter_id": 3268098
+        "approximate_died_at": 1446140
       },
       {
-        "character_id": 113975488,
-        "approximate_died_at": 914295,
-        "logged_encounter_id": null
+        "approximate_died_at": 914295
       }
     ]
   }

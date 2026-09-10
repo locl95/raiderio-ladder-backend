@@ -116,7 +116,7 @@ class WowEntitySynchronizer(
                     Duration.between(start, OffsetDateTime.now()).toMinutes()
                 } minutes"
             )
-            logger.debug("dynamic match cache hit rate: ${runDetailsCache.hitRate}%")
+            logger.debug("dynamic match cache hit rate: ${"%.2f".format(runDetailsCache.hitRate)}%")
 
             errorsList
         }
