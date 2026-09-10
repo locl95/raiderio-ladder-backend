@@ -93,7 +93,7 @@ class RaiderIoHTTPClientTest {
             result.onLeft { fail() }
             result.onRight {
                 assertEquals(RaiderIoHttpClientHelper.runDetails, it)
-                assertEquals(3, it.deathCount)
+                assertEquals(3, it.loggedDetails?.deaths?.size)
             }
         }
     }
